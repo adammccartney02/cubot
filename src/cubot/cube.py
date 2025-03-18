@@ -32,11 +32,12 @@ class Cube:
             self.faces[2, :, 3] = self.faces[2, :, 2]
             self.faces[2, :, 2] = temp
         elif face_index == 1:
-            temp = self.faces[:, 0, 1].copy()
-            self.faces[:, 0, 1] = self.faces[2, :, 0][::-1]
-            self.faces[2, :, 0] = self.faces[:, 2, 1]
-            self.faces[:, 2, 1] = self.faces[0, :, 2]
-            self.faces[0, :, 2] = temp
+            # Rotate the Red face (1)
+            temp = self.faces[0, :, 0].copy()
+            self.faces[0, :, 0] = self.faces[:, 0, 2]
+            self.faces[:, 0, 2] = self.faces[2, :, 5]
+            self.faces[2, :, 5] = self.faces[:, 2, 4][::-1]
+            self.faces[:, 2, 4] = temp[::-1]
         elif face_index == 2:
             temp = self.faces[2, :, 1].copy()
             self.faces[2, :, 1] = self.faces[:, 0, 2][::-1]
