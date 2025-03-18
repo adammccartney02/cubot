@@ -2,7 +2,7 @@ import numpy as np
 
 class Cube:
 
-    def __inti__(self):
+    def __init__(self):
         # create a 3x3x3 cube with each face represented by a 3x3 matrix
         self.faces = np.ones((3, 3, 6), dtype=int)
 
@@ -13,8 +13,9 @@ class Cube:
     def __repr__(self):
         # Create a string representation of the cube
         cube_str = ""
+        colors = ['White', 'Red', 'Green', 'Orange', 'Blue', 'Yellow'] 
         for i in range(6):
-            cube_str += f"Face {i}:\n{self.faces[:, :, i]}\n\n"
+            cube_str += f"{colors[i]}:\n{self.faces[:, :, i]}\n\n"
         return cube_str
     
     def rotate_face(self, face_index):
@@ -24,11 +25,12 @@ class Cube:
 
         # rotate the adjacent edges
         if face_index == 0:
-            temp = self.faces[0, :, 1].copy()
-            self.faces[0, :, 1] = self.faces[:, 2, 2]
-            self.faces[:, 2, 2] = self.faces[2, :, 1][::-1]
-            self.faces[2, :, 1] = self.faces[:, 0, 0][::-1]
-            self.faces[:, 0, 0] = temp[::-1]
+            # Rotate the White face (0)
+            temp = self.faces[2, :, 1].copy()
+            self.faces[2, :, 1] = self.faces[2, :, 4]
+            self.faces[2, :, 4] = self.faces[2, :, 3]
+            self.faces[2, :, 3] = self.faces[2, :, 2]
+            self.faces[2, :, 2] = temp
         elif face_index == 1:
             temp = self.faces[:, 0, 1].copy()
             self.faces[:, 0, 1] = self.faces[2, :, 0][::-1]
@@ -63,15 +65,15 @@ class Cube:
             raise ValueError("Invalid face index. Must be between 0 and 5.")
     
     def __call__(self, face_index, direction):
-        if direction == 'clockwise':
+        if direction == 'cw':
             # Rotate clockwise
             self.rotate_face(face_index)
-        elif direction == 'counterclockwise':
+        elif direction == 'cc':
             # Rotate counterclockwise by rotating three times clockwise
             self.rotate_face(face_index)
             self.rotate_face(face_index)
             self.rotate_face(face_index)
-        elif direction == 'half':
+        elif direction == 'hf':
             # Rotate half by rotating twice clockwise
             self.rotate_face(face_index)
             self.rotate_face(face_index)
