@@ -1,2 +1,2 @@
-from cube import *
+from .cube import *
 __version__ = "0.0.2"
