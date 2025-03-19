@@ -103,11 +103,12 @@ class Cube:
             self.faces[:, 0, 5] = self.faces[:, 2, 3][::-1]
             self.faces[:, 2, 3] = temp[::-1]
         elif face_index == 5:
-            temp = self.faces[1, :, 2].copy()
-            self.faces[1, :, 2] = self.faces[0, :, 1]
-            self.faces[0, :, 1] = self.faces[3, :, 2][::-1]
-            self.faces[3, :, 2] = self.faces[2, :, 1][::-1]
-            self.faces[2, :, 1] = temp
+            # Rotate the Yellow face (5)
+            temp = self.faces[0, :, 1].copy()
+            self.faces[0, :, 1] = self.faces[0, :, 2]
+            self.faces[0, :, 2] = self.faces[0, :, 3]
+            self.faces[0, :, 3] = self.faces[0, :, 4]
+            self.faces[0, :, 4] = temp
         else:
             raise ValueError("Invalid face index. Must be between 0 and 5.")
     
