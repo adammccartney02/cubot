@@ -10,15 +10,15 @@ class Cube:
         for i in range(6):
             self.faces[:, :, i] *= i
     
-    # def __str__(self):
-    #     # Create a string representation of the cube
-    #     cube_str = ""
-    #     colors = ['White', 'Red', 'Green', 'Orange', 'Blue', 'Yellow'] 
-    #     for i in range(6):
-    #         cube_str += f"{colors[i]}:\n{self.faces[:, :, i]}\n\n"
-    #     return cube_str
-    
     def __repr__(self):
+        # Create a string representation of the cube
+        cube_str = ""
+        colors = ['White', 'Red', 'Green', 'Orange', 'Blue', 'Yellow'] 
+        for i in range(6):
+            cube_str += f"{colors[i]}:\n{self.faces[:, :, i]}\n\n"
+        return cube_str
+    
+    def __str__(self):
         '''
          Y 
          R 
