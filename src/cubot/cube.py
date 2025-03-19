@@ -125,3 +125,5 @@ class Cube:
             # Rotate half by rotating twice clockwise
             self.rotate_face(face_index)
             self.rotate_face(face_index)
+        else:
+            raise ValueError("Invalid direction. Must be 'cw', 'cc', or 'hf'.")
