@@ -127,3 +127,17 @@ class Cube:
             self.rotate_face(face_index)
         else:
             raise ValueError("Invalid direction. Must be 'cw', 'cc', or 'hf'.")
+        
+    def flat_state(self):
+        # flatten the cube into a 1D array
+        flat_ints = self.faces.flatten()
+
+        # remove the center pieces
+        flat_ints = np.delete(flat_ints, [24, 25, 26, 27, 28, 29])
+
+        # build a binary array for each color and concatenate them
+        binary_array = []
+        for color in range(6):
+            binary_array.append((flat_ints == color).astype(int))
+        
+        return np.concatenate(binary_array)
