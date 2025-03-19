@@ -9,14 +9,57 @@ class Cube:
         # Initialize each face with a unique number (color)
         for i in range(6):
             self.faces[:, :, i] *= i
-
+    
+    # def __str__(self):
+    #     # Create a string representation of the cube
+    #     cube_str = ""
+    #     colors = ['White', 'Red', 'Green', 'Orange', 'Blue', 'Yellow'] 
+    #     for i in range(6):
+    #         cube_str += f"{colors[i]}:\n{self.faces[:, :, i]}\n\n"
+    #     return cube_str
+    
     def __repr__(self):
-        # Create a string representation of the cube
-        cube_str = ""
-        colors = ['White', 'Red', 'Green', 'Orange', 'Blue', 'Yellow'] 
-        for i in range(6):
-            cube_str += f"{colors[i]}:\n{self.faces[:, :, i]}\n\n"
-        return cube_str
+        '''
+         Y 
+         R 
+        BWG
+         O
+        '''
+        def box(id):
+            match id:
+                case 0:
+                    return "\033[47m   \033[0m"  # White
+                case 1:
+                    return "\033[41m   \033[0m"  # Red
+                case 2:
+                    return "\033[42m   \033[0m" # Green
+                case 3:
+                    return "\033[45m   \033[0m" # Orange
+                case 4:
+                    return "\033[46m   \033[0m" # Blue
+                case 5:
+                    return "\033[43m   \033[0m" #"\033[33m \u25A0 \033[0m" # Yellow
+                case _:
+                    return " "
+                
+        display_str = \
+        '           ' + box(self.faces[0, 0, 5]) + box(self.faces[0, 1, 5]) + box(self.faces[0, 2, 5]) + '\n' + \
+        '           ' + box(self.faces[1, 0, 5]) + box(self.faces[1, 1, 5]) + box(self.faces[1, 2, 5]) + '\n' + \
+        '           ' + box(self.faces[2, 0, 5]) + box(self.faces[2, 1, 5]) + box(self.faces[2, 2, 5]) + '\n' + \
+        '\n' + \
+        '           ' + box(self.faces[0, 0, 1]) + box(self.faces[0, 1, 1]) + box(self.faces[0, 2, 1]) + '\n' + \
+        '           ' + box(self.faces[1, 0, 1]) + box(self.faces[1, 1, 1]) + box(self.faces[1, 2, 1]) + '\n' + \
+        '           ' + box(self.faces[2, 0, 1]) + box(self.faces[2, 1, 1]) + box(self.faces[2, 2, 1]) + '\n' + \
+        '\n' + \
+        box(self.faces[0, 2, 4]) + box(self.faces[1, 2, 4]) + box(self.faces[2, 2, 4]) + '  ' + box(self.faces[0, 0, 0]) + box(self.faces[0, 1, 0]) + box(self.faces[0, 2, 0]) + '  ' + box(self.faces[2, 0, 2]) + box(self.faces[1, 0, 2]) + box(self.faces[0, 0, 2]) + '\n' + \
+        box(self.faces[0, 1, 4]) + box(self.faces[1, 1, 4]) + box(self.faces[2, 1, 4]) + '  ' + box(self.faces[1, 0, 0]) + box(self.faces[1, 1, 0]) + box(self.faces[1, 2, 0]) + '  ' + box(self.faces[2, 1, 2]) + box(self.faces[1, 1, 2]) + box(self.faces[0, 1, 2]) + '\n' + \
+        box(self.faces[0, 0, 4]) + box(self.faces[1, 0, 4]) + box(self.faces[2, 0, 4]) + '  ' + box(self.faces[2, 0, 0]) + box(self.faces[2, 1, 0]) + box(self.faces[2, 2, 0]) + '  ' + box(self.faces[2, 2, 2]) + box(self.faces[1, 2, 2]) + box(self.faces[0, 2, 2]) + '\n' + \
+        '\n' + \
+        '           ' + box(self.faces[2, 2, 3]) + box(self.faces[2, 1, 3]) + box(self.faces[2, 0, 3]) + '\n' + \
+        '           ' + box(self.faces[1, 2, 3]) + box(self.faces[1, 1, 3]) + box(self.faces[1, 0, 3]) + '\n' + \
+        '           ' + box(self.faces[0, 2, 3]) + box(self.faces[0, 1, 3]) + box(self.faces[0, 0, 3]) + '\n'
+
+        return display_str
     
     def rotate_face(self, face_index):
         # Rotate a face of the cube 90 degrees clockwise
