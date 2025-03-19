@@ -34,7 +34,7 @@ class Cube:
                 case 2:
                     return "\033[42m   \033[0m" # Green
                 case 3:
-                    return "\033[45m   \033[0m" # Orange
+                    return "\033[45m   \033[0m" # Orange its actually purple :(
                 case 4:
                     return "\033[46m   \033[0m" # Blue
                 case 5:
@@ -77,10 +77,10 @@ class Cube:
         elif face_index == 1:
             # Rotate the Red face (1)
             temp = self.faces[0, :, 0].copy()
-            self.faces[0, :, 0] = self.faces[:, 0, 2]
+            self.faces[0, :, 0] = self.faces[:, 0, 2][::-1]
             self.faces[:, 0, 2] = self.faces[2, :, 5]
             self.faces[2, :, 5] = self.faces[:, 2, 4][::-1]
-            self.faces[:, 2, 4] = temp[::-1]
+            self.faces[:, 2, 4] = temp
         elif face_index == 2:
             # Rotate the Green face (2)
             temp = self.faces[:, 2, 0].copy()
@@ -89,11 +89,12 @@ class Cube:
             self.faces[:, 2, 5] = self.faces[:, 2, 1]
             self.faces[:, 2, 1] = temp
         elif face_index == 3:
-            temp = self.faces[:, 2, 1].copy()
-            self.faces[:, 2, 1] = self.faces[0, :, 0]
-            self.faces[0, :, 0] = self.faces[:, 0, 1][::-1]
-            self.faces[:, 0, 1] = self.faces[2, :, 2][::-1]
-            self.faces[2, :, 2] = temp[::-1]
+            # Rotate the Orange face (3)
+            temp = self.faces[2, :, 0].copy()
+            self.faces[2, :, 0] = self.faces[:, 0, 4]
+            self.faces[:, 0, 4] = self.faces[0, :, 5][::-1]
+            self.faces[0, :, 5] = self.faces[:, 2, 2]
+            self.faces[:, 2, 2] = temp[::-1]
         elif face_index == 4:
             temp = self.faces[1, :, 0].copy()
             self.faces[1, :, 0] = self.faces[2, :, 1][::-1]
