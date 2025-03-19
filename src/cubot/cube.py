@@ -141,3 +141,9 @@ class Cube:
             binary_array.append((flat_ints == color).astype(int))
         
         return np.concatenate(binary_array)
+    
+    def copy(self):
+        # Create a deep copy of the cube
+        new_cube = Cube()
+        new_cube.faces = self.faces.copy()
+        return new_cube
