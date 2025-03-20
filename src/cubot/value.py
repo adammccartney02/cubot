@@ -20,7 +20,7 @@ class ValueFunction(nn.Module):
         layers.append(nn.Linear(hidden_shape[-1], output_dim))
 
         # create the sequential model
-        self.linear_relu_stack = nn.Sequential(layers)
+        self.linear_relu_stack = nn.Sequential(*layers)
 
     def forward(self, x):
         x = self.flatten(x)
