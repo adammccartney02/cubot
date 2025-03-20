@@ -4,7 +4,6 @@ from torch import nn
 class ValueFunction(nn.Module):
     def __init__(self, hidden_shape):
         super(ValueFunction, self).__init__()
-        self.flatten = nn.Flatten()
 
         # input and output dimensions
         input_dim = 288 # flat_sate size
@@ -23,6 +22,5 @@ class ValueFunction(nn.Module):
         self.linear_relu_stack = nn.Sequential(*layers)
 
     def forward(self, x):
-        x = self.flatten(x)
         logits = self.linear_relu_stack(x)
         return logits
