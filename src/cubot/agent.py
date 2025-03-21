@@ -76,6 +76,11 @@ class Agent:
         X = X[:index]
         y = y[:index]
 
+        # shuffle the data
+        p = np.random.permutation(len(X))
+        X = X[p]
+        y = y[p]
+
         return X, y
 
     def scrambled_like(self, X:np.ndarray, rat=1.0, moves=20) -> Xy:
