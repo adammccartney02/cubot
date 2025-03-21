@@ -1,12 +1,11 @@
 from .cube import Cube
 import random
 import numpy as np
-from typing import TypeVar
 
 class Agent:
 
-    # types for hints
-    Xy = TypeVar(tuple[np.ndarray, np.ndarray])
+    # type alias
+    type Xy = tuple[np.ndarray, np.ndarray]
 
     def __init__(self):
         self.epsilon = 0.1 # exploration rate
@@ -78,8 +77,7 @@ class Agent:
 
         # shuffle the data
         p = np.random.permutation(len(X))
-        X = X[p]
-        y = y[p]
+        X, y = X[p], y[p]
 
         return X, y
 
@@ -103,6 +101,5 @@ class Agent:
                 action = random.choice(self.actions)
                 random_cube(action[0], action[1])
             X[i] = random_cube.flat_state()
-            index += 1
 
         return X, y
