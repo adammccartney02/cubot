@@ -1,8 +1,12 @@
 from .cube import Cube
 import random
 import numpy as np
+from typing import TypeVar
 
 class Agent:
+
+    # types for hints
+    Xy = TypeVar(tuple[np.ndarray, np.ndarray])
 
     def __init__(self):
         self.epsilon = 0.1 # exploration rate
@@ -10,7 +14,7 @@ class Agent:
         faces, directions =  np.meshgrid([0, 1, 2, 3, 4, 5], ['cc', 'cw', 'hf'])
         self.actions = list(zip(faces.flatten(), directions.flatten()))
 
-    def get_all_states(self, cubes, n):
+    def n_step_states(self, cubes:list[Cube]|Cube, n:int) -> list[Cube]:
         '''recursively find all possible states of the cube after n moves'''
 
         # if cubes is a single cube, convert it to a list
@@ -30,45 +34,70 @@ class Agent:
             return new_cubes
         else:
             # recursively find all possible states for n-1 moves
-            return self.get_all_states(new_cubes, n-1)
+            return self.n_step_states(new_cubes, n-1)
         
-    def initialize_npz(self, n):
+    def n_step_data(self, n:int) -> Xy:
         '''
-        generate data for n moves from the solved state and an 
-        equal number of random states and save it to a npz file
+        Generate data for n moves from the solved state. 
+        Remove duplicates and shuffle.
         '''
+
+        # max of n = 4 for now
+        assert n <= 4, "n must be less than or equal to 4"
 
         # find the total number of states
         total_states = 0
         for i in range(n):
             total_states += len(self.actions)**(i+1)
 
-        assert total_states < 111151, f"Too many states to generate: {total_states}. Please reduce n."
-
         # initialize the output array
-        X = np.zeros((total_states*2, 288), dtype=bool)
-        y = np.zeros((total_states*2, 1), dtype=float)
-        index = 0
+        X = np.zeros((total_states, 288), dtype=bool)
+        y = np.zeros((total_states, 1), dtype=float)
 
         # generate the data for known states
+        index = 0
         for i in range(n):
+            # assume the it takes i+i moves to get back to the solved state
             state_value = self.gamma**(i+1)
-            cubes = self.get_all_states(Cube(), i+1)
+
+            # get all possible cube configurations for i+1 moves
+            cubes = self.n_step_states(Cube(), i+1)
             for cube in cubes:
-                X[index] = cube.flat_state()
-                y[index] = state_value
-                index += 1
+                # get the state
+                state = cube.flat_state()
+
+                # check if the state is already in the array
+                if np.where((X == state).all(axis=1))[0].size == 0:
+                    X[index] = cube.flat_state()
+                    y[index] = state_value
+                    index += 1
+            
+        # remove the unused rows in X and y
+        X = X[:index]
+        y = y[:index]
+
+        return X, y
+
+    def scrambled_like(self, X:np.ndarray, rat=1.0, moves=20) -> Xy:
+        '''
+        Generate data for scrambled states. The number of scarambled states is 
+        len(X) * rat.
+        '''
+
+        # initialize the output array
+        total_states = int(len(X) * rat)
+        X = np.zeros((total_states, 288), dtype=bool)
+        y = np.zeros((total_states, 1), dtype=float)
 
         # generate random states and assign a value of 0
-        n_scrambled = 20
-        for _ in range(total_states):
+        for i in range(total_states):
             random_cube = Cube()
-            for _ in range(random.randint(1, n_scrambled)):
+
+            # apply random moves to the cube
+            for _ in range(moves):
                 action = random.choice(self.actions)
                 random_cube(action[0], action[1])
-            X[index] = random_cube.flat_state()
-            y[index] = 0
+            X[i] = random_cube.flat_state()
             index += 1
 
-        # save X and y to an npz file
-        np.savez("data.npz", X=X, y=y)
+        return X, y
