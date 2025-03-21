@@ -6,6 +6,7 @@ class Agent:
 
     # type alias
     type Xy = tuple[np.ndarray, np.ndarray]
+    type Cuboid = list[Cube]|Cube
 
     def __init__(self):
         self.epsilon = 0.1 # exploration rate
@@ -13,7 +14,7 @@ class Agent:
         faces, directions =  np.meshgrid([0, 1, 2, 3, 4, 5], ['cc', 'cw', 'hf'])
         self.actions = list(zip(faces.flatten(), directions.flatten()))
 
-    def n_step_states(self, cubes:list[Cube]|Cube, n:int) -> list[Cube]:
+    def n_step_states(self, cubes:Cuboid, n:int) -> Cuboid:
         '''recursively find all possible states of the cube after n moves'''
 
         # if cubes is a single cube, convert it to a list
