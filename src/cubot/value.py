@@ -1,4 +1,4 @@
-from torch import nn
+from torch import nn, optim, tensor, device, cuda, float32
 
 class ValueFunction(nn.Module):
     def __init__(self, hidden_shape):
@@ -20,6 +20,42 @@ class ValueFunction(nn.Module):
         # create the sequential model
         self.linear_relu_stack = nn.Sequential(*layers)
 
+        # set optimizer and loss function
+        self.optimizer = optim.Adam(self.parameters(), lr=0.001)
+        self.loss_fn = nn.MSELoss()
+
+        # add to the device
+        self.device = device("cuda" if cuda.is_available() else "cpu")
+        self.to(self.device)
+        self.loss_fn.to(self.device)
+
     def forward(self, x):
         logits = self.linear_relu_stack(x)
         return logits
+    
+    def train(self, X, y, epochs=5000):
+
+        # Convert numpy arrays to torch tensors
+        X_tensor = tensor(X, dtype=float32).to(self.device)
+        y_tensor = tensor(y, dtype=float32).to(self.device)
+
+        losses = []
+
+        # Training loop
+        for epoch in range(epochs):
+            # Zero the gradients
+            self.optimizer.zero_grad()
+
+            # Forward pass
+            y_pred = self.forward(X_tensor)
+
+            # Compute the loss
+            loss = self.loss_fn(y_pred, y_tensor)
+            losses.append(loss.item())
+
+            # Backward pass and optimization
+            loss.backward()
+            self.optimizer.step()
+
+            if (epoch+1) % 50 == 0:
+                print(f"Epoch {epoch+1}/{epochs}, Loss: {loss.item()}")
