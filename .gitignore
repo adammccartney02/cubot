@@ -3,4 +3,4 @@ __pycache__/
 .ipynb_checkpoints
 *.ipynb
 src/cubot.egg-info
-scr/cubot/archive.py
+archive.py
