@@ -2,11 +2,12 @@ from .cube import Cube
 from .value import ValueFunction
 import random
 import numpy as np
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 class Agent:
 
     # type alias
-    type Xy = tuple[np.ndarray, np.ndarray]
+    type Xy = tuple[np.ndarray, np.ndarray]|tuple[np.ndarray, float]
     type Cuboid = list[Cube]|Cube
     type Act = list[int, str]
 
@@ -22,10 +23,66 @@ class Agent:
         # build model
         self.model = ValueFunction(hidden_shape=hidden_shape)
 
-    def __call__(self, cube:Cube):
-        return self.model(cube)
+    def __call__(self, cube:Cube, max_n=20):
+        # loop through greedy actions
+        c = 0
+        solved = False
+        while not solved:
+            # update move count
+            c += 1
+            if c > max_n:
+                return 0
+
+            # take greedy move
+            action = self.greedy(cube)
+            cube(*action)
+
+            # check solved
+            solved = cube == Cube()
+
+        # return number of moves
+        return c
     
-    def train(self, start, stop, step, epochs=1_000):
+    def n_gen(self, n_moves, n_data):
+        '''generate n_data points from cubes with n_moves'''
+        
+        with ProcessPoolExecutor() as executor:
+            futers = [executor.submit(self.gen_point, n_moves) for _ in range(n_data)]
+
+            s, u = 0, 0
+            data = []
+            for f in as_completed(futers):
+                # add data
+                data.append(f.result()[:])
+
+                # display
+                s += f.result()[1] > 0
+                u += f.result()[1] == 0
+                print(f'Solved: {s}, Unsolved {u}', end='\r')
+
+        return data
+
+
+    def gen_point(self, n_moves:int) -> Xy:
+        '''generate a data point from a cube with n_moves'''
+
+        # gen cube
+        cube = Cube()
+        for _ in range(n_moves):
+            action = random.choice(self.actions)
+            cube(*action)
+
+        # save state
+        X = cube.flat_state()
+        moves = self(cube)
+        if moves:
+            y = self.gamma**moves
+        else: # move == 0 for unsolved cubes
+            y = 0
+
+        return X, y
+
+    def train(self, start, stop, step, epochs=1000):
         # n moves
         X_known, y_known = self.n_step_data(start)
 
@@ -39,7 +96,6 @@ class Agent:
 
         # first training
         self.model.train_vf(X, y, epochs=epochs)
-
 
     def n_step_states(self, cubes:Cuboid, n=1) -> Cuboid:
         '''recursively find all possible states of the cube after n moves'''
@@ -85,7 +141,7 @@ class Agent:
         index = 0
         for i in range(n):
             # assume the it takes i+i moves to get back to the solved state
-            state_value = self.gamma**(i+1)
+            state_value = self.gamma*(i+1)
 
             # get all possible cube configurations for i+1 moves
             cubes = self.n_step_states(Cube(), i+1)
@@ -197,7 +253,7 @@ class Agent:
         best_action = 0
         for action, next_cube in enumerate(next_cubes):
             # find the value
-            value = self(next_cube)
+            value = self.model(next_cube)
 
             # is it best
             if value > best_value:
