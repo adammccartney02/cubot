@@ -7,12 +7,13 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 class Agent:
 
     # type alias
-    type Xy = tuple[np.ndarray, np.ndarray]|tuple[np.ndarray, float]
+    type Xy = tuple[np.ndarray, np.ndarray]
     type Cuboid = list[Cube]|Cube
     type Act = list[int, str]
 
     def __init__(self, hidden_shape:list[int]):
         # set hyperparameters
+        self.hidden_shape = hidden_shape
         self.epsilon = 0.1 # exploration rate
         self.gamma = 0.9 # discount rate
 
@@ -21,7 +22,10 @@ class Agent:
         self.actions = list(zip(faces.flatten(), directions.flatten()))
 
         # build model
-        self.model = ValueFunction(hidden_shape=hidden_shape)
+        self.model = ValueFunction(hidden_shape=self.hidden_shape)
+
+    def clear_model(self):
+        self.model = ValueFunction(hidden_shape=self.hidden_shape)
 
     def __call__(self, cube:Cube, max_n=20):
         # loop through greedy actions
@@ -59,9 +63,10 @@ class Agent:
                 s += f.result()[1] > 0
                 u += f.result()[1] == 0
                 print(f'Solved: {s}, Unsolved {u}', end='\r')
-
-        return data
-
+        print()
+        X = np.array([X for (X, _) in data])
+        y = np.array([[y] for (_, y) in data])
+        return X, y
 
     def gen_point(self, n_moves:int) -> Xy:
         '''generate a data point from a cube with n_moves'''
@@ -82,9 +87,10 @@ class Agent:
 
         return X, y
 
-    def train(self, start, stop, step, epochs=1000):
+    def train(self, start, stop, step, batch_size=50, cycles=3, epochs=800):
         # n moves
         X_known, y_known = self.n_step_data(start)
+        print(len(y_known))
 
         # scrambled data
         X_scram, y_scram = self.scrambled_like(X_known)
@@ -92,10 +98,45 @@ class Agent:
         # combine and shuffle
         X, y = np.vstack((X_known, X_scram)), np.vstack((y_known, y_scram))
         p = np.random.permutation(len(X))
-        X, y = X[p], y[p]
+        X1, y1 = X[p], y[p]
 
         # first training
-        self.model.train_vf(X, y, epochs=epochs)
+        self.model.train_vf(X1, y1, epochs=epochs)
+
+        # run greedy
+        Xg, yg = self.n_gen(start+1, 100)
+        solved = [y[0]!=0 for y in yg]
+        Xg, yg = Xg[solved], yg[solved]
+
+        # combine and shuffle
+        X, y = np.vstack((X_known, X_scram, Xg)), np.vstack((y_known, y_scram, yg))
+        p = np.random.permutation(len(X))
+        X2, y2 = X[p], y[p]
+
+        # clear and retrain
+        self.clear_model()
+        self.model.train_vf(X2, y2, epochs=epochs)
+
+        # run greedy
+        Xg, yg = self.n_gen(start+1, 100)
+        solved = [y[0]!=0 for y in yg]
+        Xg, yg = Xg[solved], yg[solved]
+
+         # combine and shuffle
+        X, y = np.vstack((X_known, X_scram, Xg)), np.vstack((y_known, y_scram, yg))
+        p = np.random.permutation(len(X))
+        X2, y2 = X[p], y[p]
+
+        # clear and retrain
+        self.clear_model()
+        self.model.train_vf(X2, y2, epochs=epochs)
+
+        # run greedy
+        Xg, yg = self.n_gen(start+1, 100)
+        solved = [y[0]!=0 for y in yg]
+        Xg, yg = Xg[solved], yg[solved]
+        
+
 
     def n_step_states(self, cubes:Cuboid, n=1) -> Cuboid:
         '''recursively find all possible states of the cube after n moves'''
@@ -141,7 +182,7 @@ class Agent:
         index = 0
         for i in range(n):
             # assume the it takes i+i moves to get back to the solved state
-            state_value = self.gamma*(i+1)
+            state_value = self.gamma**(i+1)
 
             # get all possible cube configurations for i+1 moves
             cubes = self.n_step_states(Cube(), i+1)
@@ -188,60 +229,6 @@ class Agent:
 
         return X, y
     
-    def n_greedy_data(self, n:int, data_points=1_000) -> Xy:
-        '''scramble a cube n times and solve it with greedy'''
-
-        # initialize data arrays
-        X = np.zeros((data_points, len(Cube().flat_state())), dtype=bool)
-        y = np.zeros(data_points, dtype=float)
-
-        data_count = 0
-        misses = 0
-        while data_count < data_points:
-            # get fresh cube
-            cube = Cube()
-
-            # scramble
-            for _ in range(n):
-                action = random.choice(self.actions)
-                cube(*action)
-
-            # save state
-            initial_state = cube.flat_state
-
-            # solve
-            c = 0
-            solved = False
-            while not solved:
-                # update move count
-                c += 1
-                if c > 10:
-                    break
-
-                # take greedy move
-                action = self.greedy(cube)
-                cube(*action)
-
-                # check solved
-                solved = cube == Cube()
-
-            # add data point if salved
-            if solved:
-                X[data_count] = initial_state
-                y[data_count] = self.gamma**c
-                data_count += 1
-            else:
-                misses += 1
-
-            # print progress
-            print(f'Solved: {data_count}, Unsolved: {misses}', end='\r')
-
-            # if too many cubes are unsolved stop
-            if misses > 2*data_points:
-                break
-        
-        return X, y
-
     def greedy(self, cube:Cube) -> Act:
         '''take the greedy action. return the new cube and action taken'''
 
