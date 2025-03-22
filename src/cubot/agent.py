@@ -62,7 +62,7 @@ class Agent:
                 # display
                 s += f.result()[1] > 0
                 u += f.result()[1] == 0
-                print(f'Solved: {s}, Unsolved {u}', end='\r')
+                print(f's: {s}, u: {u}, t: {n_data}', end='\r')
         print()
         X = np.array([X for (X, _) in data])
         y = np.array([[y] for (_, y) in data])
@@ -79,7 +79,7 @@ class Agent:
 
         # save state
         X = cube.flat_state()
-        moves = self(cube)
+        moves = self(cube, max_n=n_moves+1)
         if moves:
             y = self.gamma**moves
         else: # move == 0 for unsolved cubes
@@ -87,10 +87,9 @@ class Agent:
 
         return X, y
 
-    def train(self, start, stop, step, batch_size=50, cycles=3, epochs=800):
+    def train(self, start, stop, step, batch_size=100, cycles=5, epochs=1000):
         # n moves
         X_known, y_known = self.n_step_data(start)
-        print(len(y_known))
 
         # scrambled data
         X_scram, y_scram = self.scrambled_like(X_known)
@@ -98,45 +97,34 @@ class Agent:
         # combine and shuffle
         X, y = np.vstack((X_known, X_scram)), np.vstack((y_known, y_scram))
         p = np.random.permutation(len(X))
-        X1, y1 = X[p], y[p]
+        X, y = X[p], y[p]
 
         # first training
-        self.model.train_vf(X1, y1, epochs=epochs)
+        print("Dataset size: ", len(y))
+        self.model.train_vf(X, y, epochs=epochs)
+
+        for n_moves in range(start, stop, step):
+            print("Nuber of Moves: ", n_moves)
+            for _ in range(cycles):
+                # run greedy
+                Xg, yg = self.n_gen(n_moves+1, batch_size)
+                solved = [y[0]!=0 for y in yg]
+                Xg, yg = Xg[solved], yg[solved]
+
+                # combine and shuffle
+                X, y = np.vstack((X, Xg)), np.vstack((y, yg))
+                p = np.random.permutation(len(X))
+                X, y = X[p], y[p]
+
+                # clear and retrain
+                self.clear_model()
+                print("Dataset size: ", len(y))
+                self.model.train_vf(X, y, epochs=epochs)
 
         # run greedy
-        Xg, yg = self.n_gen(start+1, 100)
+        Xg, yg = self.n_gen(stop, batch_size)
         solved = [y[0]!=0 for y in yg]
         Xg, yg = Xg[solved], yg[solved]
-
-        # combine and shuffle
-        X, y = np.vstack((X_known, X_scram, Xg)), np.vstack((y_known, y_scram, yg))
-        p = np.random.permutation(len(X))
-        X2, y2 = X[p], y[p]
-
-        # clear and retrain
-        self.clear_model()
-        self.model.train_vf(X2, y2, epochs=epochs)
-
-        # run greedy
-        Xg, yg = self.n_gen(start+1, 100)
-        solved = [y[0]!=0 for y in yg]
-        Xg, yg = Xg[solved], yg[solved]
-
-         # combine and shuffle
-        X, y = np.vstack((X_known, X_scram, Xg)), np.vstack((y_known, y_scram, yg))
-        p = np.random.permutation(len(X))
-        X2, y2 = X[p], y[p]
-
-        # clear and retrain
-        self.clear_model()
-        self.model.train_vf(X2, y2, epochs=epochs)
-
-        # run greedy
-        Xg, yg = self.n_gen(start+1, 100)
-        solved = [y[0]!=0 for y in yg]
-        Xg, yg = Xg[solved], yg[solved]
-        
-
 
     def n_step_states(self, cubes:Cuboid, n=1) -> Cuboid:
         '''recursively find all possible states of the cube after n moves'''
