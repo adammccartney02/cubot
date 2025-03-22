@@ -1,4 +1,5 @@
 from .cube import Cube
+from .value import ValueFunction
 import random
 import numpy as np
 
@@ -8,13 +9,38 @@ class Agent:
     type Xy = tuple[np.ndarray, np.ndarray]
     type Cuboid = list[Cube]|Cube
 
-    def __init__(self):
+    def __init__(self, hidden_shape:list[int]):
+        # set hyperparameters
         self.epsilon = 0.1 # exploration rate
         self.gamma = 0.9 # discount rate
+
+        # set actions
         faces, directions =  np.meshgrid([0, 1, 2, 3, 4, 5], ['cc', 'cw', 'hf'])
         self.actions = list(zip(faces.flatten(), directions.flatten()))
 
-    def n_step_states(self, cubes:Cuboid, n:int) -> Cuboid:
+        # build model
+        self.model = ValueFunction(hidden_shape=hidden_shape)
+
+    def __call__(self, cube:Cube):
+        return self.model(cube)
+    
+    def train(self, start, stop, step):
+        # n moves
+        X_known, y_known = self.n_step_data(start)
+
+        # scrambled data
+        X_scram, y_scram = self.scrambled_like(X_known)
+
+        # combine and shuffle
+        X, y = np.vstack((X_known, X_scram)), np.vstack((y_known, y_scram))
+        p = np.random.permutation(len(X))
+        X, y = X[p], y[p]
+
+        # first training
+        self.model.train_vf(X, y, epochs=800)
+
+
+    def n_step_states(self, cubes:Cuboid, n=1) -> Cuboid:
         '''recursively find all possible states of the cube after n moves'''
 
         # if cubes is a single cube, convert it to a list
@@ -36,7 +62,7 @@ class Agent:
             # recursively find all possible states for n-1 moves
             return self.n_step_states(new_cubes, n-1)
         
-    def n_step_data(self, n:int) -> Xy:
+    def n_step_data(self, n=1) -> Xy:
         '''
         Generate data for n moves from the solved state. 
         Remove duplicates and shuffle.
@@ -104,3 +130,23 @@ class Agent:
             X[i] = random_cube.flat_state()
 
         return X, y
+
+    def greedy(self, cube:Cube) -> int:
+        '''take the greedy action. return the new cube and action taken'''
+
+        # find possible cubes
+        next_cubes = self.n_step_states(cube)
+
+        # find values of states
+        best_value = -1
+        best_action = 0
+        for action, next_cube in enumerate(next_cubes):
+            # find the value
+            value = self(next_cube)
+
+            # is it best
+            if value > best_value:
+                best_value = value
+                best_action = action
+
+        return self.actions[best_action]
