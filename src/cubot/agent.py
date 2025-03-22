@@ -217,6 +217,30 @@ class Agent:
 
         return X, y
     
+    def n_scrambled_data(self, n=18, data_points=100):
+        '''
+        generates data with n moves and assigns a value of gamma**n
+        '''
+
+        # initialize
+        X = np.zeros((data_points, 288), dtype=bool)
+        y = np.ones((data_points, 1))*self.gamma**n
+
+        for i in range(data_points):
+            # create a cube
+            random_cube = Cube()
+
+            # shuffle the cube
+            for _ in range(n):
+                action = random.choice(self.actions)
+                random_cube(*action)
+
+            # assing to x
+            X[i] = random_cube.flat_state()
+
+        return X, y
+        
+    
     def greedy(self, cube:Cube) -> Act:
         '''take the greedy action. return the new cube and action taken'''
 
