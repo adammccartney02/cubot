@@ -1,4 +1,5 @@
 from torch import nn, optim, tensor, device, cuda, float32
+from .cube import Cube
 
 class ValueFunction(nn.Module):
     def __init__(self, hidden_shape):
@@ -33,7 +34,23 @@ class ValueFunction(nn.Module):
         logits = self.linear_relu_stack(x)
         return logits
     
-    def train(self, X, y, epochs=5000):
+    def __call__(self, cube:Cube):
+
+        # check for a solved cube
+        if cube == Cube():
+            return 1.0
+        else:
+            # flatten
+            flat = cube.flat_state()
+
+            # to tensor
+            tens = tensor(flat, dtype=float32).to(self.device)
+
+            # predict
+            return super().__call__(tens).item()
+
+    
+    def train_vf(self, X, y, epochs=5000):
 
         # Convert numpy arrays to torch tensors
         X_tensor = tensor(X, dtype=float32).to(self.device)
@@ -57,5 +74,5 @@ class ValueFunction(nn.Module):
             loss.backward()
             self.optimizer.step()
 
-            if (epoch+1) % 50 == 0:
+            if (epoch+1) % 100 == 0:
                 print(f"Epoch {epoch+1}/{epochs}, Loss: {loss.item()}")
