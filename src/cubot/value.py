@@ -75,4 +75,6 @@ class ValueFunction(nn.Module):
             self.optimizer.step()
 
             if (epoch+1) % 100 == 0:
-                print(f"Epoch {epoch+1}/{epochs}, Loss: {loss.item()}")
+                print(' '*100, end='\r')
+                print(f"Epoch {epoch+1}/{epochs}, Loss: {loss.item()}", end='\r')
+        print()
