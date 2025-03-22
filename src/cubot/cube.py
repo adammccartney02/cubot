@@ -147,3 +147,6 @@ class Cube:
         new_cube = Cube()
         new_cube.faces = self.faces.copy()
         return new_cube
+    
+    def __eq__(self, other:'Cube'):
+        return np.array_equal(self.faces, other.faces)
