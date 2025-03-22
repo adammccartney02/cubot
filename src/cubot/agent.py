@@ -8,6 +8,7 @@ class Agent:
     # type alias
     type Xy = tuple[np.ndarray, np.ndarray]
     type Cuboid = list[Cube]|Cube
+    type Act = list[int, str]
 
     def __init__(self, hidden_shape:list[int]):
         # set hyperparameters
@@ -24,7 +25,7 @@ class Agent:
     def __call__(self, cube:Cube):
         return self.model(cube)
     
-    def train(self, start, stop, step):
+    def train(self, start, stop, step, epochs=1_000):
         # n moves
         X_known, y_known = self.n_step_data(start)
 
@@ -37,7 +38,7 @@ class Agent:
         X, y = X[p], y[p]
 
         # first training
-        self.model.train_vf(X, y, epochs=800)
+        self.model.train_vf(X, y, epochs=epochs)
 
 
     def n_step_states(self, cubes:Cuboid, n=1) -> Cuboid:
@@ -130,8 +131,62 @@ class Agent:
             X[i] = random_cube.flat_state()
 
         return X, y
+    
+    def n_greedy_data(self, n:int, data_points=1_000) -> Xy:
+        '''scramble a cube n times and solve it with greedy'''
 
-    def greedy(self, cube:Cube) -> int:
+        # initialize data arrays
+        X = np.zeros((data_points, len(Cube().flat_state())), dtype=bool)
+        y = np.zeros(data_points, dtype=float)
+
+        data_count = 0
+        misses = 0
+        while data_count < data_points:
+            # get fresh cube
+            cube = Cube()
+
+            # scramble
+            for _ in range(n):
+                action = random.choice(self.actions)
+                cube(*action)
+
+            # save state
+            initial_state = cube.flat_state
+
+            # solve
+            c = 0
+            solved = False
+            while not solved:
+                # update move count
+                c += 1
+                if c > 10:
+                    break
+
+                # take greedy move
+                action = self.greedy(cube)
+                cube(*action)
+
+                # check solved
+                solved = cube == Cube()
+
+            # add data point if salved
+            if solved:
+                X[data_count] = initial_state
+                y[data_count] = self.gamma**c
+                data_count += 1
+            else:
+                misses += 1
+
+            # print progress
+            print(f'Solved: {data_count}, Unsolved: {misses}', end='\r')
+
+            # if too many cubes are unsolved stop
+            if misses > 2*data_points:
+                break
+        
+        return X, y
+
+    def greedy(self, cube:Cube) -> Act:
         '''take the greedy action. return the new cube and action taken'''
 
         # find possible cubes
