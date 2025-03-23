@@ -87,15 +87,23 @@ class Agent:
 
         return X, y
 
-    def train(self, start, stop, step, batch_size=100, cycles=5, epochs=1000):
+    def train(self, start, stop, step, batch_size=100, cycles=3, epochs=1600):
         # n moves
-        X_known, y_known = self.n_step_data(start)
+        X0, y0 = self.n_step_data(start)
+        good_Xs = [X0]
+        good_ys = [y0]
 
         # scrambled data
-        X_scram, y_scram = self.scrambled_like(X_known)
+        ok_Xs = []
+        ok_ys = []
+        for i in range(start+step*2, stop, step):
+            Xs, ys = self.n_scrambled_data(i, batch_size)
+            ok_Xs.append(Xs)
+            ok_ys.append(ys)
+
 
         # combine and shuffle
-        X, y = np.vstack((X_known, X_scram)), np.vstack((y_known, y_scram))
+        X, y = np.vstack((*ok_Xs, *good_Xs)), np.vstack((*ok_ys, *good_ys))
         p = np.random.permutation(len(X))
         X, y = X[p], y[p]
 
@@ -103,16 +111,24 @@ class Agent:
         print("Dataset size: ", len(y))
         self.model.train_vf(X, y, epochs=epochs)
 
-        for n_moves in range(start, stop, step):
-            print("Nuber of Moves: ", n_moves)
+        # intrement number of moves
+        for n_moves in range(start+step, stop, step):
+            print('*'*50)
+            print("Number of Moves: ", n_moves)
+
+            # cycle at n moves
             for _ in range(cycles):
                 # run greedy
-                Xg, yg = self.n_gen(n_moves+1, batch_size)
+                Xg, yg = self.n_gen(n_moves, batch_size)
                 solved = [y[0]!=0 for y in yg]
                 Xg, yg = Xg[solved], yg[solved]
 
+                # add new data to the good data
+                good_Xs.append(Xg)
+                good_ys.append(yg)
+
                 # combine and shuffle
-                X, y = np.vstack((X, Xg)), np.vstack((y, yg))
+                X, y = np.vstack((*ok_Xs, *good_Xs)), np.vstack((*ok_ys, *good_ys))
                 p = np.random.permutation(len(X))
                 X, y = X[p], y[p]
 
@@ -120,11 +136,14 @@ class Agent:
                 self.clear_model()
                 print("Dataset size: ", len(y))
                 self.model.train_vf(X, y, epochs=epochs)
+                print()
+
+            # remove ok data at lowest number of moves
+            ok_Xs = ok_Xs[1:]
+            ok_ys = ok_ys[1:]
 
         # run greedy
         Xg, yg = self.n_gen(stop, batch_size)
-        solved = [y[0]!=0 for y in yg]
-        Xg, yg = Xg[solved], yg[solved]
 
     def n_step_states(self, cubes:Cuboid, n=1) -> Cuboid:
         '''recursively find all possible states of the cube after n moves'''
@@ -217,7 +236,7 @@ class Agent:
 
         return X, y
     
-    def n_scrambled_data(self, n=18, data_points=100):
+    def n_scrambled_data(self, n=18, data_points=100) -> Xy:
         '''
         generates data with n moves and assigns a value of gamma**n
         '''
@@ -240,7 +259,6 @@ class Agent:
 
         return X, y
         
-    
     def greedy(self, cube:Cube) -> Act:
         '''take the greedy action. return the new cube and action taken'''
 
