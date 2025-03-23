@@ -65,7 +65,7 @@ class Agent:
                 print(f's: {s}, u: {u}, t: {n_data}', end='\r')
         print()
         X = np.array([X for (X, _) in data])
-        y = np.array([[y] for (_, y) in data])
+        y = np.array([[y] if y!=0 else [n_moves] for (_, y) in data])
         return X, y
 
     def gen_point(self, n_moves:int) -> Xy:
