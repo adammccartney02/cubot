@@ -150,3 +150,341 @@ class Cube:
     
     def __eq__(self, other:'Cube'):
         return np.array_equal(self.faces, other.faces)
+    
+    def roll(self):
+        '''make 24 orientations of the cube'''
+
+        def sort_faces(faces:np.ndarray) -> np.ndarray:
+            map = {face:faces[1, 1, face] for face in range(6)}
+            map = {v: k for k, v in map.items()}
+
+            new_tens = []
+            for mat in faces:
+                new_mat = []
+                for vec in mat:
+                    new_vec = []
+                    for i in range(len(vec)):
+                        new_vec.append(vec[map[i]])
+                    new_mat.append(new_vec)
+                new_tens.append(new_mat)
+            new_faces = np.array(new_tens)
+
+            return new_faces
+
+        cubes = []
+
+        # for each face
+        for face in range(6):
+            # find the 4 orientations
+            match face:
+                # white
+                case 0:
+                    # red up
+                    cubes.append(self.copy())
+
+                    # green up
+                    cmap = {0:0, 1:2, 2:3, 3:4, 4:1, 5:5}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], -1)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], 1)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                    # orange up
+                    cmap = {0:0, 1:3, 2:4, 3:1, 4:2, 5:5}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], 2)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], 2)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                    # blue up
+                    cmap = {0:0, 1:4, 2:1, 3:2, 4:3, 5:5}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], 1)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], -1)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                # red
+                case 1:
+                    # yellow up
+                    cmap = {0:1, 1:5, 2:2, 3:0, 4:4, 5:3}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], 2)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], -1)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], 2)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], 1)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                    # green up
+                    cmap = {0:1, 1:2, 2:0, 3:4, 4:5, 5:3}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], 2)
+                    faces[:,:,1] = np.rot90(faces[:,:,1], -1)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], -1)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], -1)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], 1)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                    # white up
+                    cmap = {0:1, 1:0, 2:4, 3:5, 4:2, 5:3}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], 2)
+                    faces[:,:,1] = np.rot90(faces[:,:,1], 2)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], -1)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], 1)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                    # blue up
+                    cmap = {0:1, 1:4, 2:5, 3:2, 4:0, 5:3}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], 2)
+                    faces[:,:,1] = np.rot90(faces[:,:,1], 1)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], -1)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], 1)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], 1)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                # green
+                case 2:
+                    # red up
+                    cmap = {0:2, 1:1, 2:5, 3:3, 4:0, 5:4}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], 1)
+                    faces[:,:,1] = np.rot90(faces[:,:,1], 1)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], 1)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], -1)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], 1)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], 1)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                    # yellow up
+                    cmap = {0:2, 1:5, 2:3, 3:0, 4:1, 5:4}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], 1)
+                    faces[:,:,1] = np.rot90(faces[:,:,1], 1)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], -1)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], 2)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], 1)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                    # orange up
+                    cmap = {0:2, 1:3, 2:0, 3:1, 4:5, 5:4}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], 1)
+                    faces[:,:,1] = np.rot90(faces[:,:,1], 1)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], -1)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], -1)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], -1)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], 1)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                    # white up
+                    cmap = {0:2, 1:0, 2:1, 3:5, 4:3, 5:4}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], 1)
+                    faces[:,:,1] = np.rot90(faces[:,:,1], 1)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], 2)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], -1)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], 1)
+                    cube.faces = faces
+                    cubes.append(cube)
+                    
+                # orange
+                case 3:
+                    # green up
+                    cmap = {0:3, 1:2, 2:5, 3:4, 4:0, 5:1}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,1] = np.rot90(faces[:,:,1], 1)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], 1)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], 1)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], -1)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], 2)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                    # yellow up
+                    cmap = {0:3, 1:5, 2:4, 3:0, 4:2, 5:1}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,1] = np.rot90(faces[:,:,1], 2)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], 1)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], -1)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], 2)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                    # blue up
+                    cmap = {0:3, 1:4, 2:0, 3:2, 4:5, 5:1}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,1] = np.rot90(faces[:,:,1], -1)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], 1)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], -1)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], -1)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], 2)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                    # white up
+                    cmap = {0:3, 1:0, 2:2, 3:5, 4:4, 5:1}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,2] = np.rot90(faces[:,:,2], 1)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], 2)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], -1)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], 2)
+                    cube.faces = faces
+                    cubes.append(cube)
+                    
+                # blue
+                case 4:
+                    # red up
+                    cmap = {0:4, 1:1, 2:0, 3:3, 4:5, 5:2}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], -1)
+                    faces[:,:,1] = np.rot90(faces[:,:,1], -1)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], -1)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], 1)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], -1)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], -1)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                    # white up
+                    cmap = {0:4, 1:0, 2:3, 3:5, 4:1, 5:2}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], -1)
+                    faces[:,:,1] = np.rot90(faces[:,:,1], -1)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], 1)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], 2)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], -1)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+
+                    # orange up
+                    cmap = {0:4, 1:3, 2:5, 3:1, 4:0, 5:2}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], -1)
+                    faces[:,:,1] = np.rot90(faces[:,:,1], -1)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], 1)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], 1)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], 1)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], -1)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                    # yellow up
+                    cmap = {0:4, 1:5, 2:1, 3:0, 4:3, 5:2}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], -1)
+                    faces[:,:,1] = np.rot90(faces[:,:,1], -1)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], 2)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], 1)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], -1)
+                    cube.faces = faces
+                    cubes.append(cube)
+                    
+                # yellow
+                case 5:
+                    # red up
+                    cmap = {0:5, 1:1, 2:4, 3:3, 4:2, 5:0}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], 2)
+                    faces[:,:,1] = np.rot90(faces[:,:,1], 2)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], 2)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], 2)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], 2)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], 2)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+                    # blue up
+                    cmap = {0:5, 1:4, 2:3, 3:2, 4:1, 5:0}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], -1)
+                    faces[:,:,1] = np.rot90(faces[:,:,1], 2)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], 2)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], 2)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], 2)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], 1)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+
+                    # orange up
+                    cmap = {0:5, 1:3, 2:2, 3:1, 4:4, 5:0}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,1] = np.rot90(faces[:,:,1], 2)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], 2)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], 2)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], 2)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+
+                    # green up
+                    cmap = {0:5, 1:2, 2:1, 3:4, 4:3, 5:0}
+                    cvec = np.vectorize(cmap.get)
+                    cube = Cube()
+                    faces = sort_faces(cvec(self.faces))
+                    faces[:,:,0] = np.rot90(faces[:,:,0], 1)
+                    faces[:,:,1] = np.rot90(faces[:,:,1], 2)
+                    faces[:,:,2] = np.rot90(faces[:,:,2], 2)
+                    faces[:,:,3] = np.rot90(faces[:,:,3], 2)
+                    faces[:,:,4] = np.rot90(faces[:,:,4], 2)
+                    faces[:,:,5] = np.rot90(faces[:,:,5], -1)
+                    cube.faces = faces
+                    cubes.append(cube)
+
+        return cubes
