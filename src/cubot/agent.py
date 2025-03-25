@@ -50,27 +50,36 @@ class Agent:
     def n_gen(self, n_moves, n_data):
         '''generate n_data points from cubes with n_moves'''
         
-        with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor(max_workers=12) as executor:
             futers = [executor.submit(self.gen_point, n_moves) for _ in range(n_data)]
 
             s, u = 0, 0
-            data = []
+            data_roll = []
             for f in as_completed(futers):
                 # add data
-                data.append(f.result()[:])
+                data_roll.append(f.result()[:])
 
                 # display
-                s += f.result()[1] > 0
-                u += f.result()[1] == 0
+                s += f.result()[1][0] > 0
+                u += f.result()[1][0] == 0
                 print(f's: {s}, u: {u}, t: {n_data}', end='\r')
         print()
-        X = np.array([X for (X, _) in data])
-        y = np.array([[y] if y!=0 else [n_moves] for (_, y) in data])
+
+        # complile list
+        X, y = [], []
+        for d_roll in data_roll:
+            for i in range(24):
+                X.append(d_roll[0][i])
+                y.append([d_roll[1][i] if d_roll[1][i]!=0 else n_moves])
+        X = np.array(X)
+        y = np.array(y)
+
         return X, y
 
     def gen_point(self, n_moves:int) -> Xy:
         '''generate a data point from a cube with n_moves'''
 
+        # try:
         # gen cube
         cube = Cube()
         for _ in range(n_moves):
@@ -78,20 +87,33 @@ class Agent:
             cube(*action)
 
         # save state
-        X = cube.flat_state()
+        X = []
+        for c in cube.roll():
+            X.append(c.flat_state())
+
+        # solve
         moves = self(cube, max_n=n_moves+1)
+
+        # save state value
+        y = []
         if moves:
-            y = self.gamma**moves
+            for _ in range(len(X)):
+                y.append(self.gamma**moves)
         else: # move == 0 for unsolved cubes
-            y = 0
+            for _ in range(len(X)):
+                y.append(0)
 
         return X, y
+        # except Exception as e:
+        #     print(f'Error in gen_point: {e}')
+        #     raise
 
-    def train(self, start, stop, step, batch_size=100, cycles=3, epochs=1600):
+    def train(self, start, stop, step, batch_size=10, cycles=5, epochs=3200):
         # n moves
         X0, y0 = self.n_step_data(start)
         good_Xs = [X0]
         good_ys = [y0]
+        print("Grid data size: ", len(y0))
 
         # scrambled data
         ok_Xs = []
@@ -100,6 +122,7 @@ class Agent:
             Xs, ys = self.n_scrambled_data(i, batch_size)
             ok_Xs.append(Xs)
             ok_ys.append(ys)
+        print("Initial random data size: ", batch_size*len(ok_ys))
 
 
         # combine and shuffle
@@ -108,13 +131,13 @@ class Agent:
         X, y = X[p], y[p]
 
         # first training
-        print("Dataset size: ", len(y))
         self.model.train_vf(X, y, epochs=epochs)
 
         # intrement number of moves
         for n_moves in range(start+step, stop, step):
             print('*'*50)
             print("Number of Moves: ", n_moves)
+            print()
 
             # cycle at n moves
             for _ in range(cycles):
@@ -122,6 +145,7 @@ class Agent:
                 Xg, yg = self.n_gen(n_moves, batch_size)
                 solved = [y[0]!=0 for y in yg]
                 Xg, yg = Xg[solved], yg[solved]
+                print("Data added: ", len(yg))
 
                 # add new data to the good data
                 good_Xs.append(Xg)
@@ -139,8 +163,10 @@ class Agent:
                 print()
 
             # remove ok data at lowest number of moves
-            ok_Xs = ok_Xs[1:]
-            ok_ys = ok_ys[1:]
+            if len(ok_ys) > 0:
+                print("Data removed: ", len(ok_ys[0]))
+                ok_Xs = ok_Xs[1:]
+                ok_ys = ok_ys[1:]
 
         # run greedy
         Xg, yg = self.n_gen(stop, batch_size)

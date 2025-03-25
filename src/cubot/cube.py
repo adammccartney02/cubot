@@ -151,7 +151,7 @@ class Cube:
     def __eq__(self, other:'Cube'):
         return np.array_equal(self.faces, other.faces)
     
-    def roll(self):
+    def roll(self) -> list['Cube']:
         '''make 24 orientations of the cube'''
 
         def sort_faces(faces:np.ndarray) -> np.ndarray:
@@ -486,5 +486,4 @@ class Cube:
                     faces[:,:,5] = np.rot90(faces[:,:,5], -1)
                     cube.faces = faces
                     cubes.append(cube)
-
         return cubes
