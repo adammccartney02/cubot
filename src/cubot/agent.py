@@ -50,6 +50,7 @@ class Agent:
 
         # cube_list will be rolled before training
         cube_list = []
+        value_list = []
 
         #################### 1 move ####################
 
@@ -58,26 +59,42 @@ class Agent:
         for _ in range(3):
             cube1(0, 'cc')
             cube_list.append(cube1.copy())
+            value_list.append(self.gamma)
 
         #################### 2 moves ####################
 
-        # make a copy of all 1 move cubes
+        # make a copy of all 1 move cubes (white)
         cube_list_1move = deepcopy(cube_list)
 
-        # find adjecent move configurations
+        # find adjecent move configurations (red)
         for cube in cube_list_1move:
             for _ in range(3):
                 cube(1, 'cc')
                 cube_list.append(cube)
+                value_list.append(self.gamma**2)
 
-        # find oposite move configuration
+        # find opposite move configuration (yellow)
         for cube in cube_list_1move:
             for _ in range (3):
-                cube(1, 'cc')
+                cube(5, 'cc')
                 cube_list.append(cube)
+                value_list.append(self.gamma**2)
 
         #################### n moves ####################
-        
+
+        # find the value of a random move
+        # 15/18 are productive
+        # 1/18 undoes the previous move
+        #     1/6 chance that 2 moves ago the opposite face was moved
+        #     2/18 moves are unproductive
+        #     1/18 moves undoes the previous move
+        random_move_factor = 0.74 # 14/18 - (4/18)/6
+
+        # fill the cube list with partially shuffled cubes
+        for i in range(int(len(cube_list), n)):
+            cube = Cube()
+            moves = random.randint(3, 18)
+
 
 
         
