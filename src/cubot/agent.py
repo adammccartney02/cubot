@@ -45,7 +45,7 @@ class Agent:
         # return number of moves
         return c
     
-    def n_gen(self, n:int) -> list[Cube]:
+    def n_gen(self, n:int) -> tuple[list[Cube], list[float]]:
         '''generate n data points distibuted evenly across 1 to 18 moves'''
 
         # cube_list will be rolled before training
@@ -82,18 +82,11 @@ class Agent:
 
         #################### n moves ####################
 
-        # find the value of a random move
-        # 15/18 are productive
-        # 1/18 undoes the previous move
-        #     1/6 chance that 2 moves ago the opposite face was moved
-        #     2/18 moves are unproductive
-        #     1/18 moves undoes the previous move
-        # random_move_factor = 0.74 # 14/18 - (4/18)/6
-
-        # n = 1 -> 1, max at n = 20,
-        def val(n:int) -> float:
+        # find the value of n random moves
+        def val(gamma:float, n:int) -> float:
             n = min(20, n)
-            return n * (40/39 - n/39)
+            value = gamma ** n*(1-n*0.025)
+            return value
 
         # fill the cube list with partially shuffled cubes
         for i in range(int(len(cube_list), n)):
@@ -108,75 +101,46 @@ class Agent:
 
             # assign X and y
             cube_list.append(cube)
-            value_list.append(self.gamma ** val(moves))
+            value_list.append(val(moves))
 
         return cube_list, value_list
 
-        
+    def train(self, dataset_size=1000, epochs=1600, max_i=100):
 
+        # generate cubes
+        X_cubes, y_cubes = self.n_gen(dataset_size)
 
-    def train(self, start, stop, step, batch_size=10, cycles=5, epochs=3200):
-        # n moves
-        X0, y0 = self.n_step_data(start)
-        good_Xs = [X0]
-        good_ys = [y0]
-        print("Grid data size: ", len(y0))
+        # generate states for rolled cubes
+        X, y = [], []
+        for i, cube in enumerate(X_cubes):
+            roll = cube.roll()
+            for r_cube in roll:
+                X.append(r_cube.flat_state())
+                y.append(y_cubes[i])
 
-        # scrambled data
-        ok_Xs = []
-        ok_ys = []
-        for i in range(start+step*2, stop, step):
-            Xs, ys = self.n_scrambled_data(i, batch_size)
-            ok_Xs.append(Xs)
-            ok_ys.append(ys)
-        print("Initial random data size: ", batch_size*len(ok_ys))
-
-
-        # combine and shuffle
-        X, y = np.vstack((*ok_Xs, *good_Xs)), np.vstack((*ok_ys, *good_ys))
-        p = np.random.permutation(len(X))
+        # shuffle
+        p = np.random.permutation(X)
         X, y = X[p], y[p]
 
+        # loop until good at rubix cube
+        acc = 0
+        while acc < 0.9:
+            # train value function
+            self.model.train_vf(X, y, epochs=epochs)
+
+            # solve cubes in cube_list
+            # NOTE: solve random orientation of the cube
+
+            # update y for solved cubes
+
+            # find accuracy
+
+            # stop at max iterations
+            c += 1
+            if c > max_i:
+                break
+
         # first training
-        self.model.train_vf(X, y, epochs=epochs)
-
-        # intrement number of moves
-        for n_moves in range(start+step, stop, step):
-            print('*'*50)
-            print("Number of Moves: ", n_moves)
-            print()
-
-            # cycle at n moves
-            for _ in range(cycles):
-                # run greedy
-                Xg, yg = self.n_gen(n_moves, batch_size)
-                solved = [y[0]!=0 for y in yg]
-                Xg, yg = Xg[solved], yg[solved]
-                print("Data added: ", len(yg))
-
-                # add new data to the good data
-                good_Xs.append(Xg)
-                good_ys.append(yg)
-
-                # combine and shuffle
-                X, y = np.vstack((*ok_Xs, *good_Xs)), np.vstack((*ok_ys, *good_ys))
-                p = np.random.permutation(len(X))
-                X, y = X[p], y[p]
-
-                # clear and retrain
-                self.model = ValueFunction(hidden_shape=self.hidden_shape)
-                print("Dataset size: ", len(y))
-                self.model.train_vf(X, y, epochs=epochs)
-                print()
-
-            # remove ok data at lowest number of moves
-            if len(ok_ys) > 0:
-                print("Data removed: ", len(ok_ys[0]))
-                ok_Xs = ok_Xs[1:]
-                ok_ys = ok_ys[1:]
-
-        # run greedy
-        Xg, yg = self.n_gen(stop, batch_size)
         
     def greedy(self, cube:Cube) -> Act:
         '''take the greedy action. return the new cube and action taken'''
