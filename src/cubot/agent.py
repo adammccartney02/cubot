@@ -88,14 +88,29 @@ class Agent:
         #     1/6 chance that 2 moves ago the opposite face was moved
         #     2/18 moves are unproductive
         #     1/18 moves undoes the previous move
-        random_move_factor = 0.74 # 14/18 - (4/18)/6
+        # random_move_factor = 0.74 # 14/18 - (4/18)/6
+
+        # n = 1 -> 1, max at n = 20,
+        def val(n:int) -> float:
+            n = min(20, n)
+            return n * (40/39 - n/39)
 
         # fill the cube list with partially shuffled cubes
         for i in range(int(len(cube_list), n)):
+            # get fresh cube
             cube = Cube()
             moves = random.randint(3, 18)
 
+            # scramble
+            for _ in range(moves):
+                action = random.choice(self.actions)
+                cube(*action)
 
+            # assign X and y
+            cube_list.append(cube)
+            value_list.append(self.gamma ** val(moves))
+
+        return cube_list, value_list
 
         
 
