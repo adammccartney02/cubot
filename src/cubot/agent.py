@@ -149,7 +149,12 @@ class Agent:
 
         # loop until good at rubix cube
         acc = 0
+        c = 0
         while acc < 0.9:
+            # print header
+            print('*'*50)
+            print('Cycle: ', c)
+
             # train value function
             self.model.train_vf(X_flat, y_flat, epochs=epochs)
 
@@ -174,12 +179,12 @@ class Agent:
 
             # find accuracy
             acc = sum(s_cubes)/len(s_cubes)
+            print('Accuracy: ', acc)
 
             # stop at max iterations
             c += 1
             if c > max_i:
                 break
-
         
     def greedy(self, cube:Cube) -> Act:
         '''take the greedy action. return the new cube and action taken'''
