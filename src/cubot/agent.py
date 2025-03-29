@@ -105,7 +105,7 @@ class Agent:
 
         return cube_list, value_list
 
-    def train(self, dataset_size=1000, epochs=1600, max_i=100):
+    def train(self, dataset_size=1000, epochs=1600, max_i=10):
 
         # generate cubes
         X_cubes, y_cubes = self.n_gen(dataset_size)
@@ -144,20 +144,25 @@ class Agent:
         
     def greedy(self, cube:Cube) -> Act:
         '''take the greedy action. return the new cube and action taken'''
+        
+        # init
+        best_value = -100
+        best_action_idx = 0
 
-        # find possible cubes
-        next_cubes = self.n_step_states(cube)
+        # loop through all actions
+        for i, action in enumerate(self.actions):
 
-        # find values of states
-        best_value = -1
-        best_action = 0
-        for action, next_cube in enumerate(next_cubes):
-            # find the value
+            # get a posible next cube
+            next_cube = cube.copy()
+            next_cube(*action)
+
+            # evaluate the cube
             value = self.model(next_cube)
 
-            # is it best
+            # find best value and action
             if value > best_value:
                 best_value = value
-                best_action = action
+                best_action_idx = i
 
-        return self.actions[best_action]
+        # return the best action
+        return self.actions[best_action_idx]
