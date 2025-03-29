@@ -25,7 +25,10 @@ class Agent:
         # build model
         self.model = ValueFunction(hidden_shape=self.hidden_shape)
 
-    def __call__(self, cube:Cube, max_n=20):
+    def __call__(self, in_cube:Cube, max_n=20):
+        # copy the cube
+        cube = in_cube.copy()
+
         # loop through greedy actions
         c = 0
         solved = False
@@ -105,42 +108,78 @@ class Agent:
 
         return cube_list, value_list
 
+    def point(self, cube:Cube, i:int):
+
+        # get a random orientation of the cube
+        rand_cube = np.random.choice(cube.roll())
+
+        # solve the cube
+        moves = self(rand_cube)
+
+        # assign value if solved
+        if moves:
+            s = True
+            y = self.gamma ** moves
+        else:
+            s = False
+            y = -100
+
+        return s, y, i
+
     def train(self, dataset_size=1000, epochs=1600, max_i=10):
 
         # generate cubes
         X_cubes, y_cubes = self.n_gen(dataset_size)
+        np.savez('initial_cubes.npz', X_cubes=X_cubes, y_cubes=y_cubes)
+
+        # initialize an array to track if cubes have been solved
+        s_cubes = np.zeros_like(y, dtype=bool)
 
         # generate states for rolled cubes
-        X, y = [], []
+        X_flat, y_flat = [], []
         for i, cube in enumerate(X_cubes):
             roll = cube.roll()
             for r_cube in roll:
-                X.append(r_cube.flat_state())
-                y.append(y_cubes[i])
+                X_flat.append(r_cube.flat_state())
+                y_flat.append(y_cubes[i])
 
         # shuffle
-        p = np.random.permutation(X)
-        X, y = X[p], y[p]
+        p = np.random.permutation(X_flat)
+        X_flat, y_flat = X_flat[p], y_flat[p]
 
         # loop until good at rubix cube
         acc = 0
         while acc < 0.9:
             # train value function
-            self.model.train_vf(X, y, epochs=epochs)
+            self.model.train_vf(X_flat, y_flat, epochs=epochs)
 
-            # solve cubes in cube_list
-            # NOTE: solve random orientation of the cube
+            # use 12 cores to solve all cubes in X_cubes
+            with ProcessPoolExecutor(max_workers=12) as executor:
+                # submit 
+                futers = [executor.submit(self.point, cube, i) for i, cube in enumerate(X_cubes)]
 
-            # update y for solved cubes
+                # extract data
+                for f in as_completed(futers):
+                    s, y, i = f.result()
+
+                    # updata y and s
+                    y_cubes[i] = y
+                    s_cubes[i] = s
+
+                    # display
+                    solved += s == 1
+                    unsolved += s == 0
+                    print(f's: {solved}, u: {unsolved}, t: {len(y_cubes)}', end='\r')
+                print()
 
             # find accuracy
+            acc = sum(s_cubes)/len(s_cubes)
 
             # stop at max iterations
             c += 1
             if c > max_i:
                 break
 
-        # first training
         
     def greedy(self, cube:Cube) -> Act:
         '''take the greedy action. return the new cube and action taken'''
