@@ -22,7 +22,7 @@ class ValueFunction(nn.Module):
         self.linear_relu_stack = nn.Sequential(*layers)
 
         # set optimizer and loss function
-        self.optimizer = optim.Adam(self.parameters(), lr=0.001)
+        self.optimizer = optim.Adam(self.parameters(), lr=0.01)
         self.loss_fn = nn.MSELoss()
 
         # add to the device

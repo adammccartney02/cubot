@@ -4,6 +4,9 @@ import random
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from copy import deepcopy
+import time
+from sklearn.utils import shuffle
+import matplotlib.pyplot as plt
 
 class Agent:
 
@@ -86,13 +89,13 @@ class Agent:
         #################### n moves ####################
 
         # find the value of n random moves
-        def val(gamma:float, n:int) -> float:
+        def val(n:int) -> float:
             n = min(20, n)
-            value = gamma ** n*(1-n*0.025)
+            value = self.gamma ** n*(1-n*0.025)
             return value
 
         # fill the cube list with partially shuffled cubes
-        for i in range(int(len(cube_list), n)):
+        for i in range(len(cube_list), n):
             # get fresh cube
             cube = Cube()
             moves = random.randint(3, 18)
@@ -105,6 +108,10 @@ class Agent:
             # assign X and y
             cube_list.append(cube)
             value_list.append(val(moves))
+
+            # print progress
+            print(f'Generating cubes: {i+1}/{n}', end='\r')
+        print()
 
         return cube_list, value_list
 
@@ -126,37 +133,53 @@ class Agent:
 
         return s, y, i
 
-    def train(self, dataset_size=1000, epochs=1600, max_i=10):
+    def train(self, dataset_size=10000, epochs=1600, max_i=10):
 
         # generate cubes
         X_cubes, y_cubes = self.n_gen(dataset_size)
-        np.savez('initial_cubes.npz', X_cubes=X_cubes, y_cubes=y_cubes)
 
         # initialize an array to track if cubes have been solved
-        s_cubes = np.zeros_like(y, dtype=bool)
+        s_cubes = np.zeros_like(y_cubes, dtype=bool)
+
+        # shuffle the cubes
+        # X_cubes, y_cubes, s_cubes = shuffle(X_cubes, y_cubes, s_cubes)
 
         # generate states for rolled cubes
-        X_flat, y_flat = [], []
-        for i, cube in enumerate(X_cubes):
+        X_flat = np.zeros((24*dataset_size, 288), dtype=bool)
+        y_flat = np.zeros((24*dataset_size, 1), dtype=float)
+        s_flat = np.zeros((24*dataset_size, 1), dtype=bool)
+
+        # start = time.time()
+        flat_idx = 0
+        for cube_idx, cube in enumerate(X_cubes):
+            # generate 24 cubes
             roll = cube.roll()
             for r_cube in roll:
-                X_flat.append(r_cube.flat_state())
-                y_flat.append(y_cubes[i])
+                # add the flat state
+                X_flat[flat_idx] = r_cube.flat_state()
+                y_flat[flat_idx] = y_cubes[cube_idx]
+                s_flat[flat_idx] = s_cubes[cube_idx]
+                flat_idx += 1
+            print(f'Generating flat states: {cube_idx+1}/{dataset_size}', end='\r')
+        print()
+        # end = time.time()
+        # print('Flat state time: ', end-start)
 
         # shuffle
-        p = np.random.permutation(X_flat)
-        X_flat, y_flat = X_flat[p], y_flat[p]
+        X_flat, y_flat, s_flat = shuffle(X_flat, y_flat, s_flat)
+        p = np.random.permutation(len(y_flat))
+        X, y, s = X_flat[p], y_flat[p], s_flat[p]
 
         # loop until good at rubix cube
         acc = 0
-        c = 0
+        cycle_count = 0
         while acc < 0.9:
             # print header
             print('*'*50)
-            print('Cycle: ', c)
+            print('Cycle: ', cycle_count)
 
             # train value function
-            self.model.train_vf(X_flat, y_flat, epochs=epochs)
+            self.model.train_vf(X, y, epochs=epochs)
 
             # use 12 cores to solve all cubes in X_cubes
             with ProcessPoolExecutor(max_workers=12) as executor:
@@ -164,26 +187,40 @@ class Agent:
                 futers = [executor.submit(self.point, cube, i) for i, cube in enumerate(X_cubes)]
 
                 # extract data
+                solved, unsolved = 0, 0
                 for f in as_completed(futers):
-                    s, y, i = f.result()
+                    s_res, y_res, i_res = f.result()
 
                     # updata y and s
-                    y_cubes[i] = y
-                    s_cubes[i] = s
+                    if s_res:
+                        y_cubes[i_res] = y_res
+                        s_cubes[i_res] = True
+                        solved += 1
+                    else:
+                        unsolved += 1
 
                     # display
-                    solved += s == 1
-                    unsolved += s == 0
                     print(f's: {solved}, u: {unsolved}, t: {len(y_cubes)}', end='\r')
                 print()
+
+            # update y_flat
+            j = 0
+            for i in range(len(y_cubes)):
+                for _ in range(24):
+                    y_flat[j] = y_cubes[i]
+                    j += 1
+
+            plt.plot(y_flat)
+            plt.show
+            y = y_flat[p]
 
             # find accuracy
             acc = sum(s_cubes)/len(s_cubes)
             print('Accuracy: ', acc)
 
             # stop at max iterations
-            c += 1
-            if c > max_i:
+            cycle_count += 1
+            if cycle_count > max_i:
                 break
         
     def greedy(self, cube:Cube) -> Act:
