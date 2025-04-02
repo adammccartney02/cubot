@@ -13,6 +13,7 @@ class ValueFunction(nn.Module):
         layers = []
         for i, hidden_dim in enumerate(hidden_shape):
             layers.append(nn.Linear(input_dim if i == 0 else hidden_shape[i-1], hidden_dim))
+            layers.append(nn.LayerNorm(hidden_dim))
             layers.append(nn.ReLU())
 
         # output layer
@@ -22,7 +23,7 @@ class ValueFunction(nn.Module):
         self.linear_relu_stack = nn.Sequential(*layers)
 
         # set optimizer and loss function
-        self.optimizer = optim.Adam(self.parameters(), lr=0.01)
+        self.optimizer = optim.Adam(self.parameters())
         self.loss_fn = nn.MSELoss()
 
         # add to the device
@@ -35,6 +36,8 @@ class ValueFunction(nn.Module):
         return logits
     
     def __call__(self, cube:Cube):
+
+        self.eval()
 
         # check for a solved cube
         if cube == Cube():
@@ -51,6 +54,8 @@ class ValueFunction(nn.Module):
 
     
     def train_vf(self, X, y, epochs=5000):
+
+        self.train()
 
         # Convert numpy arrays to torch tensors
         X_tensor = tensor(X, dtype=float32).to(self.device)

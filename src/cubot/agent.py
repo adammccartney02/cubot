@@ -59,15 +59,18 @@ class Agent:
         value_list = []
 
         #################### 1 move ####################
+        ones_fraction = 0.1
 
         # find all move on face 0
         cube1 = Cube()
         for _ in range(3):
             cube1(0, 'cc')
-            cube_list.append(cube1.copy())
-            value_list.append(self.gamma)
+            for _ in range(int(ones_fraction * n/3)):
+                cube_list.append(cube1.copy())
+                value_list.append(self.gamma)
 
         #################### 2 moves ####################
+        twos_fraction = 0.1
 
         # make a copy of all 1 move cubes (white)
         cube_list_1move = deepcopy(cube_list)
@@ -76,6 +79,7 @@ class Agent:
         for cube in cube_list_1move:
             for _ in range(3):
                 cube(1, 'cc')
+                # for _ in range(int(twos_fraction * n/18)):
                 cube_list.append(cube)
                 value_list.append(self.gamma**2)
 
@@ -83,6 +87,7 @@ class Agent:
         for cube in cube_list_1move:
             for _ in range (3):
                 cube(5, 'cc')
+                # for _ in range(int(twos_fraction * n/18)):
                 cube_list.append(cube)
                 value_list.append(self.gamma**2)
 
@@ -95,10 +100,11 @@ class Agent:
             return value
 
         # fill the cube list with partially shuffled cubes
+        print(len(cube_list))
         for i in range(len(cube_list), n):
             # get fresh cube
             cube = Cube()
-            moves = random.randint(3, 18)
+            moves = random.randint(3, 6)
 
             # scramble
             for _ in range(moves):
@@ -107,7 +113,7 @@ class Agent:
 
             # assign X and y
             cube_list.append(cube)
-            value_list.append(val(moves))
+            value_list.append(self.gamma ** moves)
 
             # print progress
             print(f'Generating cubes: {i+1}/{n}', end='\r')
@@ -133,37 +139,42 @@ class Agent:
 
         return s, y, i
 
-    def train(self, dataset_size=10000, epochs=1600, max_i=10):
+    def train(self, dataset_size=10000, epochs=1600, max_cycles=10, load_data=False):
 
-        # generate cubes
-        X_cubes, y_cubes = self.n_gen(dataset_size)
+        if not load_data:
+            # generate cubes
+            X_cubes, y_cubes = self.n_gen(dataset_size)
 
-        # initialize an array to track if cubes have been solved
-        s_cubes = np.zeros_like(y_cubes, dtype=bool)
+            # initialize an array to track if cubes have been solved
+            s_cubes = np.zeros_like(y_cubes, dtype=bool)
 
-        # shuffle the cubes
-        # X_cubes, y_cubes, s_cubes = shuffle(X_cubes, y_cubes, s_cubes)
+            # generate states for rolled cubes
+            X_flat = np.zeros((24*dataset_size, 288), dtype=bool)
+            y_flat = np.zeros((24*dataset_size, 1), dtype=float)
+            s_flat = np.zeros((24*dataset_size, 1), dtype=bool)
 
-        # generate states for rolled cubes
-        X_flat = np.zeros((24*dataset_size, 288), dtype=bool)
-        y_flat = np.zeros((24*dataset_size, 1), dtype=float)
-        s_flat = np.zeros((24*dataset_size, 1), dtype=bool)
+            flat_idx = 0
+            for cube_idx, cube in enumerate(X_cubes):
+                # generate 24 cubes
+                roll = cube.roll()
+                for r_cube in roll:
+                    # add the flat state
+                    X_flat[flat_idx] = r_cube.flat_state()
+                    y_flat[flat_idx] = y_cubes[cube_idx]
+                    s_flat[flat_idx] = s_cubes[cube_idx]
+                    flat_idx += 1
+                print(f'Generating flat states: {cube_idx+1}/{dataset_size}', end='\r')
+            print()
 
-        # start = time.time()
-        flat_idx = 0
-        for cube_idx, cube in enumerate(X_cubes):
-            # generate 24 cubes
-            roll = cube.roll()
-            for r_cube in roll:
-                # add the flat state
-                X_flat[flat_idx] = r_cube.flat_state()
-                y_flat[flat_idx] = y_cubes[cube_idx]
-                s_flat[flat_idx] = s_cubes[cube_idx]
-                flat_idx += 1
-            print(f'Generating flat states: {cube_idx+1}/{dataset_size}', end='\r')
-        print()
-        # end = time.time()
-        # print('Flat state time: ', end-start)
+            # save
+            np.savez('cube_dataset.npz', X_flat, y_flat, s_flat, 
+                     X_cubes, y_cubes, s_cubes)
+        else: 
+            data = np.load('cube_dataset.npz', allow_pickle=True)
+            X_flat, y_flat, s_flat = data['arr_0'], data['arr_1'], data['arr_2']
+            X_cubes, y_cubes, s_cubes = data['arr_3'], data['arr_4'], data['arr_5']
+
+
 
         # shuffle
         X_flat, y_flat, s_flat = shuffle(X_flat, y_flat, s_flat)
@@ -180,6 +191,8 @@ class Agent:
 
             # train value function
             self.model.train_vf(X, y, epochs=epochs)
+
+            break
 
             # use 12 cores to solve all cubes in X_cubes
             with ProcessPoolExecutor(max_workers=12) as executor:
@@ -220,7 +233,7 @@ class Agent:
 
             # stop at max iterations
             cycle_count += 1
-            if cycle_count > max_i:
+            if cycle_count > max_cycles:
                 break
         
     def greedy(self, cube:Cube) -> Act:
