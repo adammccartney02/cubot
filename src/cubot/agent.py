@@ -51,7 +51,7 @@ class Agent:
         # return number of moves
         return c
     
-    def n_gen(self, n:int) -> tuple[list[Cube], list[float]]:
+    def initial_gen(self) -> tuple[list[Cube], list[float]]:
         '''generate n data points distibuted evenly across 1 to 18 moves'''
 
         # cube_list will be rolled before training
@@ -59,18 +59,15 @@ class Agent:
         value_list = []
 
         #################### 1 move ####################
-        ones_fraction = 0.1
 
         # find all move on face 0
         cube1 = Cube()
         for _ in range(3):
             cube1(0, 'cc')
-            for _ in range(int(ones_fraction * n/3)):
-                cube_list.append(cube1.copy())
-                value_list.append(self.gamma)
+            cube_list.append(cube1.copy())
+            value_list.append(self.gamma)
 
         #################### 2 moves ####################
-        twos_fraction = 0.1
 
         # make a copy of all 1 move cubes (white)
         cube_list_1move = deepcopy(cube_list)
@@ -79,7 +76,6 @@ class Agent:
         for cube in cube_list_1move:
             for _ in range(3):
                 cube(1, 'cc')
-                # for _ in range(int(twos_fraction * n/18)):
                 cube_list.append(cube)
                 value_list.append(self.gamma**2)
 
@@ -87,38 +83,10 @@ class Agent:
         for cube in cube_list_1move:
             for _ in range (3):
                 cube(5, 'cc')
-                # for _ in range(int(twos_fraction * n/18)):
                 cube_list.append(cube)
                 value_list.append(self.gamma**2)
-
-        #################### n moves ####################
-
-        # find the value of n random moves
-        def val(n:int) -> float:
-            n = min(20, n)
-            value = self.gamma ** n*(1-n*0.025)
-            return value
-
-        # fill the cube list with partially shuffled cubes
-        print(len(cube_list))
-        for i in range(len(cube_list), n):
-            # get fresh cube
-            cube = Cube()
-            moves = random.randint(3, 6)
-
-            # scramble
-            for _ in range(moves):
-                action = random.choice(self.actions)
-                cube(*action)
-
-            # assign X and y
-            cube_list.append(cube)
-            value_list.append(self.gamma ** moves)
-
-            # print progress
-            print(f'Generating cubes: {i+1}/{n}', end='\r')
-        print()
-
+        
+        # return the cubes and values
         return cube_list, value_list
 
     def point(self, cube:Cube, i:int):
