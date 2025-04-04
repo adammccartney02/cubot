@@ -192,8 +192,6 @@ class Agent:
             # train value function
             self.model.train_vf(X, y, epochs=epochs)
 
-            break
-
             # use 12 cores to solve all cubes in X_cubes
             with ProcessPoolExecutor(max_workers=12) as executor:
                 # submit 
