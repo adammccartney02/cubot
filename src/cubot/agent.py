@@ -3,6 +3,10 @@ from .value import ValueFunction
 import random
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from copy import deepcopy
+import time
+from sklearn.utils import shuffle
+import matplotlib.pyplot as plt
 
 class Agent:
 
@@ -24,10 +28,10 @@ class Agent:
         # build model
         self.model = ValueFunction(hidden_shape=self.hidden_shape)
 
-    def clear_model(self):
-        self.model = ValueFunction(hidden_shape=self.hidden_shape)
+    def __call__(self, in_cube:Cube, max_n=20):
+        # copy the cube
+        cube = in_cube.copy()
 
-    def __call__(self, cube:Cube, max_n=20):
         # loop through greedy actions
         c = 0
         solved = False
@@ -47,260 +51,210 @@ class Agent:
         # return number of moves
         return c
     
-    def n_gen(self, n_moves, n_data):
-        '''generate n_data points from cubes with n_moves'''
-        
-        with ProcessPoolExecutor(max_workers=12) as executor:
-            futers = [executor.submit(self.gen_point, n_moves) for _ in range(n_data)]
+    def n_gen(self, n:int) -> tuple[list[Cube], list[float]]:
+        '''generate n data points distibuted evenly across 1 to 18 moves'''
 
-            s, u = 0, 0
-            data_roll = []
-            for f in as_completed(futers):
-                # add data
-                data_roll.append(f.result()[:])
+        # cube_list will be rolled before training
+        cube_list = []
+        value_list = []
 
-                # display
-                s += f.result()[1][0] > 0
-                u += f.result()[1][0] == 0
-                print(f's: {s}, u: {u}, t: {n_data}', end='\r')
-        print()
+        #################### 1 move ####################
+        ones_fraction = 0.1
 
-        # complile list
-        X, y = [], []
-        for d_roll in data_roll:
-            for i in range(24):
-                X.append(d_roll[0][i])
-                y.append([d_roll[1][i] if d_roll[1][i]!=0 else n_moves])
-        X = np.array(X)
-        y = np.array(y)
+        # find all move on face 0
+        cube1 = Cube()
+        for _ in range(3):
+            cube1(0, 'cc')
+            for _ in range(int(ones_fraction * n/3)):
+                cube_list.append(cube1.copy())
+                value_list.append(self.gamma)
 
-        return X, y
+        #################### 2 moves ####################
+        twos_fraction = 0.1
 
-    def gen_point(self, n_moves:int) -> Xy:
-        '''generate a data point from a cube with n_moves'''
+        # make a copy of all 1 move cubes (white)
+        cube_list_1move = deepcopy(cube_list)
 
-        # try:
-        # gen cube
-        cube = Cube()
-        for _ in range(n_moves):
-            action = random.choice(self.actions)
-            cube(*action)
+        # find adjecent move configurations (red)
+        for cube in cube_list_1move:
+            for _ in range(3):
+                cube(1, 'cc')
+                # for _ in range(int(twos_fraction * n/18)):
+                cube_list.append(cube)
+                value_list.append(self.gamma**2)
 
-        # save state
-        X = []
-        for c in cube.roll():
-            X.append(c.flat_state())
+        # find opposite move configuration (yellow)
+        for cube in cube_list_1move:
+            for _ in range (3):
+                cube(5, 'cc')
+                # for _ in range(int(twos_fraction * n/18)):
+                cube_list.append(cube)
+                value_list.append(self.gamma**2)
 
-        # solve
-        moves = self(cube, max_n=n_moves+1)
+        #################### n moves ####################
 
-        # save state value
-        y = []
-        if moves:
-            for _ in range(len(X)):
-                y.append(self.gamma**moves)
-        else: # move == 0 for unsolved cubes
-            for _ in range(len(X)):
-                y.append(0)
+        # find the value of n random moves
+        def val(n:int) -> float:
+            n = min(20, n)
+            value = self.gamma ** n*(1-n*0.025)
+            return value
 
-        return X, y
-        # except Exception as e:
-        #     print(f'Error in gen_point: {e}')
-        #     raise
+        # fill the cube list with partially shuffled cubes
+        print(len(cube_list))
+        for i in range(len(cube_list), n):
+            # get fresh cube
+            cube = Cube()
+            moves = random.randint(3, 6)
 
-    def train(self, start, stop, step, batch_size=10, cycles=5, epochs=3200):
-        # n moves
-        X0, y0 = self.n_step_data(start)
-        good_Xs = [X0]
-        good_ys = [y0]
-        print("Grid data size: ", len(y0))
-
-        # scrambled data
-        ok_Xs = []
-        ok_ys = []
-        for i in range(start+step*2, stop, step):
-            Xs, ys = self.n_scrambled_data(i, batch_size)
-            ok_Xs.append(Xs)
-            ok_ys.append(ys)
-        print("Initial random data size: ", batch_size*len(ok_ys))
-
-
-        # combine and shuffle
-        X, y = np.vstack((*ok_Xs, *good_Xs)), np.vstack((*ok_ys, *good_ys))
-        p = np.random.permutation(len(X))
-        X, y = X[p], y[p]
-
-        # first training
-        self.model.train_vf(X, y, epochs=epochs)
-
-        # intrement number of moves
-        for n_moves in range(start+step, stop, step):
-            print('*'*50)
-            print("Number of Moves: ", n_moves)
-            print()
-
-            # cycle at n moves
-            for _ in range(cycles):
-                # run greedy
-                Xg, yg = self.n_gen(n_moves, batch_size)
-                solved = [y[0]!=0 for y in yg]
-                Xg, yg = Xg[solved], yg[solved]
-                print("Data added: ", len(yg))
-
-                # add new data to the good data
-                good_Xs.append(Xg)
-                good_ys.append(yg)
-
-                # combine and shuffle
-                X, y = np.vstack((*ok_Xs, *good_Xs)), np.vstack((*ok_ys, *good_ys))
-                p = np.random.permutation(len(X))
-                X, y = X[p], y[p]
-
-                # clear and retrain
-                self.clear_model()
-                print("Dataset size: ", len(y))
-                self.model.train_vf(X, y, epochs=epochs)
-                print()
-
-            # remove ok data at lowest number of moves
-            if len(ok_ys) > 0:
-                print("Data removed: ", len(ok_ys[0]))
-                ok_Xs = ok_Xs[1:]
-                ok_ys = ok_ys[1:]
-
-        # run greedy
-        Xg, yg = self.n_gen(stop, batch_size)
-
-    def n_step_states(self, cubes:Cuboid, n=1) -> Cuboid:
-        '''recursively find all possible states of the cube after n moves'''
-
-        # if cubes is a single cube, convert it to a list
-        if isinstance(cubes, Cube):
-            cubes = [cubes]
-
-        # find all possible next states
-        new_cubes = []
-        for cube in cubes:
-            for action in self.actions:
-                new_cube = cube.copy()
-                new_cube(action[0], action[1])
-                new_cubes.append(new_cube)
-
-        # if n is 1, return the new cubes
-        if n == 1:
-            return new_cubes
-        else:
-            # recursively find all possible states for n-1 moves
-            return self.n_step_states(new_cubes, n-1)
-        
-    def n_step_data(self, n=1) -> Xy:
-        '''
-        Generate data for n moves from the solved state. 
-        Remove duplicates and shuffle.
-        '''
-
-        # max of n = 4 for now
-        assert n <= 4, "n must be less than or equal to 4"
-
-        # find the total number of states
-        total_states = 0
-        for i in range(n):
-            total_states += len(self.actions)**(i+1)
-
-        # initialize the output array
-        X = np.zeros((total_states, 288), dtype=bool)
-        y = np.zeros((total_states, 1), dtype=float)
-
-        # generate the data for known states
-        index = 0
-        for i in range(n):
-            # assume the it takes i+i moves to get back to the solved state
-            state_value = self.gamma**(i+1)
-
-            # get all possible cube configurations for i+1 moves
-            cubes = self.n_step_states(Cube(), i+1)
-            for cube in cubes:
-                # get the state
-                state = cube.flat_state()
-
-                # check if the state is already in the array
-                if np.where((X == state).all(axis=1))[0].size == 0:
-                    X[index] = cube.flat_state()
-                    y[index] = state_value
-                    index += 1
-            
-        # remove the unused rows in X and y
-        X = X[:index]
-        y = y[:index]
-
-        # shuffle the data
-        p = np.random.permutation(len(X))
-        X, y = X[p], y[p]
-
-        return X, y
-
-    def scrambled_like(self, X:np.ndarray, rat=1.0, moves=20) -> Xy:
-        '''
-        Generate data for scrambled states. The number of scarambled states is 
-        len(X) * rat.
-        '''
-
-        # initialize the output array
-        total_states = int(len(X) * rat)
-        X = np.zeros((total_states, 288), dtype=bool)
-        y = np.zeros((total_states, 1), dtype=float)
-
-        # generate random states and assign a value of 0
-        for i in range(total_states):
-            random_cube = Cube()
-
-            # apply random moves to the cube
+            # scramble
             for _ in range(moves):
                 action = random.choice(self.actions)
-                random_cube(action[0], action[1])
-            X[i] = random_cube.flat_state()
+                cube(*action)
 
-        return X, y
-    
-    def n_scrambled_data(self, n=18, data_points=100) -> Xy:
-        '''
-        generates data with n moves and assigns a value of gamma**n
-        '''
+            # assign X and y
+            cube_list.append(cube)
+            value_list.append(self.gamma ** moves)
 
-        # initialize
-        X = np.zeros((data_points, 288), dtype=bool)
-        y = np.ones((data_points, 1))*self.gamma**n
+            # print progress
+            print(f'Generating cubes: {i+1}/{n}', end='\r')
+        print()
 
-        for i in range(data_points):
-            # create a cube
-            random_cube = Cube()
+        return cube_list, value_list
 
-            # shuffle the cube
-            for _ in range(n):
-                action = random.choice(self.actions)
-                random_cube(*action)
+    def point(self, cube:Cube, i:int):
 
-            # assing to x
-            X[i] = random_cube.flat_state()
+        # get a random orientation of the cube
+        rand_cube = np.random.choice(cube.roll())
 
-        return X, y
+        # solve the cube
+        moves = self(rand_cube)
+
+        # assign value if solved
+        if moves:
+            s = True
+            y = self.gamma ** moves
+        else:
+            s = False
+            y = -100
+
+        return s, y, i
+
+    def train(self, dataset_size=10000, epochs=1600, max_cycles=10, load_data=False):
+
+        if not load_data:
+            # generate cubes
+            X_cubes, y_cubes = self.n_gen(dataset_size)
+
+            # initialize an array to track if cubes have been solved
+            s_cubes = np.zeros_like(y_cubes, dtype=bool)
+
+            # generate states for rolled cubes
+            X_flat = np.zeros((24*dataset_size, 288), dtype=bool)
+            y_flat = np.zeros((24*dataset_size, 1), dtype=float)
+            s_flat = np.zeros((24*dataset_size, 1), dtype=bool)
+
+            flat_idx = 0
+            for cube_idx, cube in enumerate(X_cubes):
+                # generate 24 cubes
+                roll = cube.roll()
+                for r_cube in roll:
+                    # add the flat state
+                    X_flat[flat_idx] = r_cube.flat_state()
+                    y_flat[flat_idx] = y_cubes[cube_idx]
+                    s_flat[flat_idx] = s_cubes[cube_idx]
+                    flat_idx += 1
+                print(f'Generating flat states: {cube_idx+1}/{dataset_size}', end='\r')
+            print()
+
+            # save
+            np.savez('cube_dataset.npz', X_flat, y_flat, s_flat, 
+                     X_cubes, y_cubes, s_cubes)
+        else: 
+            data = np.load('cube_dataset.npz', allow_pickle=True)
+            X_flat, y_flat, s_flat = data['arr_0'], data['arr_1'], data['arr_2']
+            X_cubes, y_cubes, s_cubes = data['arr_3'], data['arr_4'], data['arr_5']
+
+
+
+        # shuffle
+        X_flat, y_flat, s_flat = shuffle(X_flat, y_flat, s_flat)
+        p = np.random.permutation(len(y_flat))
+        X, y, s = X_flat[p], y_flat[p], s_flat[p]
+
+        # loop until good at rubix cube
+        acc = 0
+        cycle_count = 0
+        while acc < 0.9:
+            # print header
+            print('*'*50)
+            print('Cycle: ', cycle_count)
+
+            # train value function
+            self.model.train_vf(X, y, epochs=epochs)
+
+            # use 12 cores to solve all cubes in X_cubes
+            with ProcessPoolExecutor(max_workers=12) as executor:
+                # submit 
+                futers = [executor.submit(self.point, cube, i) for i, cube in enumerate(X_cubes)]
+
+                # extract data
+                solved, unsolved = 0, 0
+                for f in as_completed(futers):
+                    s_res, y_res, i_res = f.result()
+
+                    # updata y and s
+                    if s_res:
+                        y_cubes[i_res] = y_res
+                        s_cubes[i_res] = True
+                        solved += 1
+                    else:
+                        unsolved += 1
+
+                    # display
+                    print(f's: {solved}, u: {unsolved}, t: {len(y_cubes)}', end='\r')
+                print()
+
+            # update y_flat
+            j = 0
+            for i in range(len(y_cubes)):
+                for _ in range(24):
+                    y_flat[j] = y_cubes[i]
+                    j += 1
+
+            plt.plot(y_flat)
+            plt.show
+            y = y_flat[p]
+
+            # find accuracy
+            acc = sum(s_cubes)/len(s_cubes)
+            print('Accuracy: ', acc)
+
+            # stop at max iterations
+            cycle_count += 1
+            if cycle_count > max_cycles:
+                break
         
     def greedy(self, cube:Cube) -> Act:
         '''take the greedy action. return the new cube and action taken'''
+        
+        # init
+        best_value = -100
+        best_action_idx = 0
 
-        # find possible cubes
-        next_cubes = self.n_step_states(cube)
+        # loop through all actions
+        for i, action in enumerate(self.actions):
 
-        # find values of states
-        best_value = -1
-        best_action = 0
-        for action, next_cube in enumerate(next_cubes):
-            # find the value
+            # get a posible next cube
+            next_cube = cube.copy()
+            next_cube(*action)
+
+            # evaluate the cube
             value = self.model(next_cube)
 
-            # is it best
+            # find best value and action
             if value > best_value:
                 best_value = value
-                best_action = action
+                best_action_idx = i
 
-        return self.actions[best_action]
+        # return the best action
+        return self.actions[best_action_idx]

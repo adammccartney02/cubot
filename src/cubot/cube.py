@@ -138,7 +138,7 @@ class Cube:
         # build a binary array for each color and concatenate them
         binary_array = []
         for color in range(6):
-            binary_array.append((flat_ints == color).astype(int))
+            binary_array.append(flat_ints == color)
         
         return np.concatenate(binary_array)
     
