@@ -93,7 +93,7 @@ class Agent:
 
             # break if it takes too long
             if len(cubes) > 20:
-                return cube, -100
+                return cube, -1
 
         # set values of the cubes
         n_moves = len(cubes)
@@ -139,115 +139,113 @@ class Agent:
         # return the cubes and values
         return cube_list, value_list
 
-    def monte_carlo(self, cube:Cube, i:int):
+    def train(self, n_new_cubes=100, n_zeros=1800, 
+              acc_min=0.95, max_cycles=10, load_data=False):
 
-        # get a random orientation of the cube
-        rand_cube = np.random.choice(cube.roll())
+        def vectorize(X:list[Cube], y:list[float]) -> np.ndarray:
+            '''roll and flatten the cube'''
 
-        # solve the cube
-        moves = self(rand_cube)
-
-        # assign value if solved
-        if moves:
-            s = True
-            y = self.gamma ** moves
-        else:
-            s = False
-            y = -100
-
-        return s, y, i
-
-    def train(self, dataset_size=10000, epochs=1600, max_cycles=10, load_data=False):
-
-        if not load_data:
-            # generate cubes
-            X_cubes, y_cubes = self.n_gen(dataset_size)
-
-            # initialize an array to track if cubes have been solved
-            s_cubes = np.zeros_like(y_cubes, dtype=bool)
-
-            # generate states for rolled cubes
-            X_flat = np.zeros((24*dataset_size, 288), dtype=bool)
-            y_flat = np.zeros((24*dataset_size, 1), dtype=float)
-            s_flat = np.zeros((24*dataset_size, 1), dtype=bool)
-
+            X_flat = np.zeros((len(X)*24, 288), dtype=float)
+            y_flat = np.zeros((len(X)*24), dtype=float)
+            
+            # loop through all cubes
             flat_idx = 0
-            for cube_idx, cube in enumerate(X_cubes):
+            for cube_idx, cube in enumerate(X):
                 # generate 24 cubes
                 roll = cube.roll()
                 for r_cube in roll:
                     # add the flat state
                     X_flat[flat_idx] = r_cube.flat_state()
-                    y_flat[flat_idx] = y_cubes[cube_idx]
-                    s_flat[flat_idx] = s_cubes[cube_idx]
+                    y_flat[flat_idx] = y[cube_idx]
                     flat_idx += 1
-                print(f'Generating flat states: {cube_idx+1}/{dataset_size}', end='\r')
+                print(f'Generating flat states: {cube_idx+1}/{len(y)}', end='\r')
             print()
 
-            # save
-            np.savez('cube_dataset.npz', X_flat, y_flat, s_flat, 
-                     X_cubes, y_cubes, s_cubes)
-        else: 
-            data = np.load('cube_dataset.npz', allow_pickle=True)
-            X_flat, y_flat, s_flat = data['arr_0'], data['arr_1'], data['arr_2']
-            X_cubes, y_cubes, s_cubes = data['arr_3'], data['arr_4'], data['arr_5']
+            # shuffle the data
+            X_flat, y_flat = shuffle(X_flat, y_flat)
 
+            return X_flat, y_flat
 
+        # initialize dataset
+        X_cubes, y_cubes = self.initial_gen()
 
-        # shuffle
-        X_flat, y_flat, s_flat = shuffle(X_flat, y_flat, s_flat)
-        p = np.random.permutation(len(y_flat))
-        X, y, s = X_flat[p], y_flat[p], s_flat[p]
+        # generate zeros
+        X_zeros = np.array([Cube() for _ in range(n_zeros)])
+        y_zeros = np.zeros((n_zeros), dtype=float)
+        for i in range(n_zeros):
+            # generate a random cube
+            cube = Cube()
+            for _ in range(20):
+                action = random.choice(self.actions)
+                cube(*action)
 
-        # loop until good at rubix cube
-        acc = 0
-        cycle_count = 0
-        while acc < 0.9:
+            # add the cube to the dataset
+            X_zeros[i] = cube.copy()
+
+        # step through moves from 2 to 20
+        for n in range(3, 21):
             # print header
             print('*'*50)
-            print('Cycle: ', cycle_count)
+            print('Moves: ', n)
 
-            # train value function
-            self.model.train_vf(X, y, epochs=epochs)
+            # Cycle
+            cycle_count = 0
+            while acc < acc_min:
+                # add zeros to the dataset
+                X_w_zeros = X_cubes + X_zeros[:100*(20-n)]
+                y_w_zeros = y_cubes + y_zeros[:100*(20-n)]
 
-            # use 12 cores to solve all cubes in X_cubes
-            with ProcessPoolExecutor(max_workers=12) as executor:
-                # submit 
-                futers = [executor.submit(self.point, cube, i) for i, cube in enumerate(X_cubes)]
+                # vectorize the data
+                X, y = vectorize(X_w_zeros, y_w_zeros)
 
-                # extract data
-                solved, unsolved = 0, 0
-                for f in as_completed(futers):
-                    s_res, y_res, i_res = f.result()
+                # train value function
+                self.model.train_vf(X, y, epochs=5000)
 
-                    # updata y and s
-                    if s_res:
-                        y_cubes[i_res] = y_res
-                        s_cubes[i_res] = True
-                        solved += 1
-                    else:
-                        unsolved += 1
+                # create more data
+                X_new = np.array([Cube() for _ in range(n_new_cubes)])
+                for i in range(n_new_cubes):
+                    # generate a random cube
+                    cube = Cube()
+                    for _ in range(n):
+                        action = random.choice(self.actions)
+                        cube(*action)
 
-                    # display
-                    print(f's: {solved}, u: {unsolved}, t: {len(y_cubes)}', end='\r')
-                print()
+                    # add the cube to the dataset
+                    X_new[i] = cube.copy()
 
-            # update y_flat
-            j = 0
-            for i in range(len(y_cubes)):
-                for _ in range(24):
-                    y_flat[j] = y_cubes[i]
-                    j += 1
+                # solve
+                with ProcessPoolExecutor(max_workers=12) as executor:
+                    # submit
+                    futers = [executor.submit(self.MC, cube) for cube in X_new]
 
-            plt.plot(y_flat)
-            plt.show
-            y = y_flat[p]
+                    # extract data
+                    solved, unsolved = 0, 0
+                    for f in as_completed(futers):
+                        # get the result
+                        cubes, ys = f.result()
 
-            # find accuracy
-            acc = sum(s_cubes)/len(s_cubes)
-            print('Accuracy: ', acc)
+                        # updata y and s
+                        if ys != -1:
+                            # add cubes and values to the dataset
+                            X_cubes += cubes
+                            y_cubes += ys
 
-            # stop at max iterations
-            cycle_count += 1
-            if cycle_count > max_cycles:
-                break
+                            # update number of solved cubes
+                            solved += 1
+                        else:
+                            # update number of unsolved cubes
+                            unsolved += 1
+
+                        # display
+                        print(f's: {solved}, u: {unsolved}, t: {n_new_cubes}', end='\r')
+                    print()
+
+                # evaluate the model
+                acc = solved / (solved + unsolved)
+                print(f'Accuracy ({cycle_count}): {acc}')
+
+                # check for max cycles
+                cycle_count += 1
+                if cycle_count > max_cycles:
+                    print('Max cycles reached')
+                    break
