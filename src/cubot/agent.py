@@ -27,6 +27,31 @@ class Agent:
 
         # build model
         self.model = ValueFunction(hidden_shape=self.hidden_shape)
+        
+    def greedy(self, cube:Cube) -> Act:
+        '''take the greedy action. return the new cube and action taken'''
+        
+        # init
+        best_value = -100
+        best_action_idx = 0
+
+        # loop through all actions
+        for i, action in enumerate(self.actions):
+
+            # get a posible next cube
+            next_cube = cube.copy()
+            next_cube(*action)
+
+            # evaluate the cube
+            value = self.model(next_cube)
+
+            # find best value and action
+            if value > best_value:
+                best_value = value
+                best_action_idx = i
+
+        # return the best action
+        return self.actions[best_action_idx]
 
     def __call__(self, in_cube:Cube, max_n=20):
         # copy the cube
@@ -51,8 +76,33 @@ class Agent:
         # return number of moves
         return c
     
+    def MC(self, cube:Cube) -> tuple[Cuboid, list[float]]:
+        '''every state Monte Carlo'''
+
+        # init
+        cubes = [cube.copy()]
+
+        # loop until solved
+        while cube != Cube():
+            # get best action
+            action = self.greedy(cube)
+            cube(*action)
+
+            # update cubes
+            cubes.append(cube.copy())
+
+            # break if it takes too long
+            if len(cubes) > 20:
+                return cube, -100
+
+        # set values of the cubes
+        n_moves = len(cubes)
+        ys = [self.gamma**(n_moves-i) for i in range(len(cubes))]
+
+        return cubes, ys
+
     def initial_gen(self) -> tuple[list[Cube], list[float]]:
-        '''generate n data points distibuted evenly across 1 to 18 moves'''
+        '''generate cubes for with 1 or 2 moves'''
 
         # cube_list will be rolled before training
         cube_list = []
@@ -89,7 +139,7 @@ class Agent:
         # return the cubes and values
         return cube_list, value_list
 
-    def point(self, cube:Cube, i:int):
+    def monte_carlo(self, cube:Cube, i:int):
 
         # get a random orientation of the cube
         rand_cube = np.random.choice(cube.roll())
@@ -201,28 +251,3 @@ class Agent:
             cycle_count += 1
             if cycle_count > max_cycles:
                 break
-        
-    def greedy(self, cube:Cube) -> Act:
-        '''take the greedy action. return the new cube and action taken'''
-        
-        # init
-        best_value = -100
-        best_action_idx = 0
-
-        # loop through all actions
-        for i, action in enumerate(self.actions):
-
-            # get a posible next cube
-            next_cube = cube.copy()
-            next_cube(*action)
-
-            # evaluate the cube
-            value = self.model(next_cube)
-
-            # find best value and action
-            if value > best_value:
-                best_value = value
-                best_action_idx = i
-
-        # return the best action
-        return self.actions[best_action_idx]
