@@ -80,16 +80,16 @@ class Agent:
         '''every state Monte Carlo'''
 
         # init
-        cubes = [cube.copy()]
+        cubes = []
 
         # loop until solved
         while cube != Cube():
+            # update cubes
+            cubes.append(cube.copy())
+
             # get best action
             action = self.greedy(cube)
             cube(*action)
-
-            # update cubes
-            cubes.append(cube.copy())
 
             # break if it takes too long
             if len(cubes) > 20:
@@ -97,7 +97,8 @@ class Agent:
 
         # set values of the cubes
         n_moves = len(cubes)
-        ys = [self.gamma**(n_moves-i) for i in range(len(cubes))]
+        ys = [[self.gamma**(n_moves-i)] for i in range(len(cubes))]
+        np.savez('cube_data.npz', cubes=cubes, ys=ys, allow_pickle=True)
 
         return cubes, ys
 
@@ -115,7 +116,7 @@ class Agent:
         for _ in range(3):
             cube1(0, 'cc')
             cube_list.append(cube1.copy())
-            value_list.append(self.gamma)
+            value_list.append([self.gamma])
 
         #################### 2 moves ####################
 
@@ -127,26 +128,26 @@ class Agent:
             for _ in range(3):
                 cube(1, 'cc')
                 cube_list.append(cube)
-                value_list.append(self.gamma**2)
+                value_list.append([self.gamma**2])
 
         # find opposite move configuration (yellow)
         for cube in cube_list_1move:
             for _ in range (3):
                 cube(5, 'cc')
                 cube_list.append(cube)
-                value_list.append(self.gamma**2)
+                value_list.append([self.gamma**2])
         
         # return the cubes and values
         return cube_list, value_list
 
-    def train(self, n_new_cubes=100, n_zeros=1800, 
+    def train(self, n_new_cubes=100, n_zeros=100, 
               acc_min=0.95, max_cycles=10, load_data=False):
 
         def vectorize(X:list[Cube], y:list[float]) -> np.ndarray:
             '''roll and flatten the cube'''
 
             X_flat = np.zeros((len(X)*24, 288), dtype=float)
-            y_flat = np.zeros((len(X)*24), dtype=float)
+            y_flat = np.zeros((len(X)*24, 1), dtype=float)
             
             # loop through all cubes
             flat_idx = 0
@@ -190,16 +191,18 @@ class Agent:
 
             # Cycle
             cycle_count = 0
+            acc = 0.0
             while acc < acc_min:
                 # add zeros to the dataset
-                X_w_zeros = X_cubes + X_zeros[:100*(20-n)]
-                y_w_zeros = y_cubes + y_zeros[:100*(20-n)]
+                X_w_zeros = [*X_cubes, *X_zeros]
+                y_w_zeros = [*y_cubes, *y_zeros]
 
                 # vectorize the data
                 X, y = vectorize(X_w_zeros, y_w_zeros)
 
                 # train value function
-                self.model.train_vf(X, y, epochs=5000)
+                print('Training Data Size: ', X.shape, y.shape)
+                self.model.train_vf(X, y, epochs=500)
 
                 # create more data
                 X_new = np.array([Cube() for _ in range(n_new_cubes)])
