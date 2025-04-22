@@ -1,5 +1,44 @@
-from torch import nn, optim, tensor, device, cuda, float32
+from torch import nn, optim, tensor, device, cuda, float32, from_numpy
+from torch.utils.data import Dataset
 from .cube import Cube
+
+
+class CubeDataset(Dataset):
+
+    def __init__(self, cubes:list[Cube], ys:list[float]):
+        '''create a dataset of cubes and their values'''
+        self.divice = device("cuda" if cuda.is_available() else "cpu")
+        self.cubes = cubes
+        self.ys = ys
+        self.flat_states = []
+        self.flat_ys = []
+
+        # create flat states
+        for i, cube in enumerate(self.cubes):
+            flats = [r_cube.flat_state() for r_cube in cube.roll()]
+            self.flat_states.extend(flats)
+            self.flat_ys.extend([self.ys[i]]*24)
+
+    def __len__(self):
+        '''return the number of samples in the dataset'''
+        return len(self.flat_ys)
+
+    def __getitem__(self, idx):
+        '''return the flat state and value at the given index'''
+        flat = tensor(self.flat_states[idx]).to(self.divice)
+        y = tensor(self.flat_ys[idx]).to(self.divice)
+        return flat, y
+    
+    def add(self, cubes:list[Cube], ys:list[float]):
+        '''add cubes and ys to the dataset'''
+        self.cubes.extend(cubes)
+        self.ys.extend(ys)
+
+        # add to flat states
+        for i, cube in enumerate(cubes):
+            flats = [r_cube.flat_state() for r_cube in cube.roll()]
+            self.flat_states.extend(flats)
+            self.flat_ys.extend([ys[i]]*24)
 
 class ValueFunction(nn.Module):
     def __init__(self, hidden_shape):
