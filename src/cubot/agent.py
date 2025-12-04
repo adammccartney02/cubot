@@ -1,5 +1,5 @@
 from .cube import Cube
-from .value import ValueFunction
+from .value import ValueFunction, CubeDataset
 import random
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -43,6 +43,32 @@ class Agent:
             next_cube(*action)
 
             # evaluate the cube
+            value = self.model(next_cube)
+
+            # find best value and action
+            if value > best_value:
+                best_value = value
+                best_action_idx = i
+
+        # return the best action
+        return self.actions[best_action_idx]
+
+    def lookahead(self, cube:Cube) -> Act:
+
+        # init
+        best_value = -100
+        best_action_idx = 0
+
+        # loop through all actions
+        for i, action in enumerate(self.actions):
+
+            # get a posible next cube
+            next_cube = cube.copy()
+            next_cube(*action)
+
+            # move greedy
+            next_action = self.greedy(next_cube)
+            next_cube(*next_action)
             value = self.model(next_cube)
 
             # find best value and action
@@ -140,50 +166,35 @@ class Agent:
         # return the cubes and values
         return cube_list, value_list
 
-    def train(self, n_new_cubes=100, n_zeros=100, 
-              acc_min=0.95, max_cycles=10, load_data=False):
-
-        def vectorize(X:list[Cube], y:list[float]) -> np.ndarray:
-            '''roll and flatten the cube'''
-
-            X_flat = np.zeros((len(X)*24, 288), dtype=float)
-            y_flat = np.zeros((len(X)*24, 1), dtype=float)
-            
-            # loop through all cubes
-            flat_idx = 0
-            for cube_idx, cube in enumerate(X):
-                # generate 24 cubes
-                roll = cube.roll()
-                for r_cube in roll:
-                    # add the flat state
-                    X_flat[flat_idx] = r_cube.flat_state()
-                    y_flat[flat_idx] = y[cube_idx]
-                    flat_idx += 1
-                print(f'Generating flat states: {cube_idx+1}/{len(y)}', end='\r')
-            print()
-
-            # shuffle the data
-            X_flat, y_flat = shuffle(X_flat, y_flat)
-
-            return X_flat, y_flat
+    def train(self, n_new_cubes=10, n_zeros=10, 
+              acc_min=0.95, max_cycles=10):
 
         # initialize dataset
         X_cubes, y_cubes = self.initial_gen()
 
         # generate zeros
-        X_zeros = np.array([Cube() for _ in range(n_zeros)])
-        y_zeros = np.zeros((n_zeros), dtype=float)
+        X_zeros = [Cube() for _ in range(n_zeros)]
+        y_zeros = [[self.gamma**18] for _ in range(n_zeros)]
         for i in range(n_zeros):
             # generate a random cube
             cube = Cube()
-            for _ in range(20):
+
+            # shuffle the cube. 20 moves in gods number, but we want to be sure
+            for _ in range(30):
                 action = random.choice(self.actions)
                 cube(*action)
 
             # add the cube to the dataset
             X_zeros[i] = cube.copy()
 
-        # step through moves from 2 to 20
+        # create the dataset
+        dataset = CubeDataset(X_cubes, y_cubes)
+        dataset.add(X_zeros, y_zeros)
+
+        # dataset.export('data2.npz')
+        # return
+
+        # step through moves from 3 to 20
         for n in range(3, 21):
             # print header
             print('*'*50)
@@ -193,23 +204,28 @@ class Agent:
             cycle_count = 0
             acc = 0.0
             while acc < acc_min:
-                # add zeros to the dataset
-                X_w_zeros = [*X_cubes, *X_zeros]
-                y_w_zeros = [*y_cubes, *y_zeros]
-
-                # vectorize the data
-                X, y = vectorize(X_w_zeros, y_w_zeros)
 
                 # train value function
-                print('Training Data Size: ', X.shape, y.shape)
-                self.model.train_vf(X, y, epochs=500)
+                print('Training Data Size: ', len(dataset))
+                self.model.train_vf(dataset, int(len(dataset)/10), 240)
+                self.model.plot_losses()
+
+                # # does the model just pick an avarage value for all cubes?
+                # test_cube = Cube()
+                # test_cube(0, 'cc')
+                # a1 = self.model(test_cube)
+                # test_cube(1, 'cw')
+                # a2 = self.model(test_cube)
+                # if (a1 - a2) < 0.05:
+                #     print('Model is not learning')
+                #     return X_cubes, y_cubes
 
                 # create more data
                 X_new = np.array([Cube() for _ in range(n_new_cubes)])
                 for i in range(n_new_cubes):
                     # generate a random cube
                     cube = Cube()
-                    for _ in range(n):
+                    for _ in range(n-1):
                         action = random.choice(self.actions)
                         cube(*action)
 
@@ -217,6 +233,8 @@ class Agent:
                     X_new[i] = cube.copy()
 
                 # solve
+                X_cubes = []
+                y_cubes = []
                 with ProcessPoolExecutor(max_workers=12) as executor:
                     # submit
                     futers = [executor.submit(self.MC, cube) for cube in X_new]
@@ -245,10 +263,15 @@ class Agent:
 
                 # evaluate the model
                 acc = solved / (solved + unsolved)
+                cycle_count += 1
                 print(f'Accuracy ({cycle_count}): {acc}')
 
+                # add the new cubes to the dataset
+                dataset.add(X_cubes, y_cubes)
+
                 # check for max cycles
-                cycle_count += 1
                 if cycle_count > max_cycles:
                     print('Max cycles reached')
                     break
+
+        return X_cubes, y_cubes
